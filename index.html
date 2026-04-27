@@ -534,6 +534,9 @@ tbody tr:last-child td { border-bottom:none; }
     <div id="ronaldoAddCardContainer" style="margin-top:20px;"></div>
   </div>
 
+  <!-- ===== DYNAMIC PERSON PAGES (Rick + qualquer pessoa adicionada em Configurações) ===== -->
+  <div id="dynamicPersonPages"></div>
+
   <!-- ===== APARTAMENTO ===== -->
   <div class="page" id="page-apto">
     <div class="page-header"><h1 class="page-title">Apartamento</h1><div class="month-selector"><button onclick="changeMonth(-1)">◀</button><span class="month-label" id="monthLabelApto"></span><button onclick="changeMonth(1)">▶</button></div></div>
@@ -857,7 +860,7 @@ function navigateTo(page){
   const el=document.getElementById(page);if(el)el.classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const ni=document.querySelector(`.nav-item[data-page="${page}"]`);if(ni)ni.classList.add('active');
-  if(['page-duanni','page-alan','page-ronaldo','page-apto'].includes(page)){const pi=document.querySelector('.nav-item[data-page="page-pessoal"]');if(pi)pi.classList.add('active');}
+  if(isPersonalPage(page)){const pi=document.querySelector('.nav-item[data-page="page-pessoal"]');if(pi)pi.classList.add('active');}
   renderAll();
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('sidebarOverlay').classList.remove('open');
@@ -877,20 +880,25 @@ function renderSidebarProfiles(){
   const sp=document.getElementById('sidebarProfiles');if(!sp)return;
   if(!personalUnlocked){sp.style.display='none';return;}
   sp.style.display='block';
-  const pages={duanni:'page-duanni',alan:'page-alan',ronaldo:'page-ronaldo',apto:'page-apto'};
+  const pages=getAllPersonalPages();
   sp.innerHTML=Object.entries(pages).map(([p,pg])=>`<div class="nav-item" data-page="${pg}" onclick="navigateTo('${pg}');closePersonalPage();" style="font-size:12px;padding:5px 8px;margin-bottom:1px;"><span class="nav-icon" style="font-size:10px;">●</span>${p==='apto'?'Apartamento':capitalize(p)}</div>`).join('');
 }
 
 function renderProfileGrid(){
   const g=document.getElementById('profileGrid');
-  const colors={duanni:'#e84393',alan:'#6c5ce7',ronaldo:'#00b894',sueli:'#fdcb6e'};
-  const pages={duanni:'page-duanni',alan:'page-alan',ronaldo:'page-ronaldo'};
-  let html=Object.entries(pages).map(([p,pg])=>`
+  const colors={duanni:'#e84393',alan:'#6c5ce7',ronaldo:'#00b894',sueli:'#fdcb6e',rick:'#0984e3'};
+  const dynColors=['#0984e3','#e17055','#00cec9','#fd79a8','#a29bfe','#55efc4','#ffeaa7','#fab1a0'];
+  const pages={};
+  DATA.pessoas.forEach(p=>{pages[p]=`page-${p}`;});
+  let html=Object.entries(pages).map(([p,pg],idx)=>{
+    const color=colors[p]||dynColors[idx%dynColors.length];
+    return `
     <div class="profile-card" onclick="navigatePersonal('${pg}')">
-      <div class="avatar" style="background:${colors[p]||'#636e72'}">${p.charAt(0).toUpperCase()}</div>
+      <div class="avatar" style="background:${color}">${p.charAt(0).toUpperCase()}</div>
       <div class="pname">${capitalize(p)}</div>
       <div class="psub">Perfil pessoal</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   // Add Apartamento
   html+=`<div class="profile-card" onclick="navigatePersonal('page-apto')">
     <div class="avatar" style="background:linear-gradient(135deg,#fdcb6e,#e17055)">🏠</div>
@@ -916,7 +924,7 @@ function onMonthChange(){setMonthInputs(currentMonth);renderAll();}
 function changeMonth(d){const[y,m]=currentMonth.split('-').map(Number);const dt=new Date(y,m-1+d,1);currentMonth=dt.toISOString().slice(0,7);setMonthInputs(currentMonth);renderAll();}
 
 // ===== RENDER ALL =====
-function renderAll(){renderCards();renderPersonFilter();renderCartaoTable();renderDuanniInicio();renderDuanniMeta();renderDuanniPlanejamento();renderDuanniSimular();renderDuanniControle();renderAlan();renderRonaldo();renderApto();renderConfig();}
+function renderAll(){renderCards();renderPersonFilter();renderCartaoTable();renderDuanniInicio();renderDuanniMeta();renderDuanniPlanejamento();renderDuanniSimular();renderDuanniControle();renderAlan();renderRonaldo();renderAllDynamicPersonPages();renderApto();renderConfig();}
 
 // ===== HELPERS =====
 function capitalize(s){return s?s.charAt(0).toUpperCase()+s.slice(1):'';}
@@ -1379,6 +1387,70 @@ function renderRonaldo(){
   document.getElementById('ronaldoCartaoBody').innerHTML=(DATA.cartao||[]).filter(e=>isExpenseInMonth(e,currentMonth)&&e.quemPaga&&e.quemPaga.includes('ronaldo')).map(e=>`<tr><td>${e.descricao||e.loja||''}</td><td>${getParcelaLabel(e,currentMonth)}</td><td><strong>${formatMoney(getPersonShare(e,'ronaldo'))}</strong></td></tr>`).join('');
 }
 
+// ===== DYNAMIC PERSON PAGES =====
+const PROTECTED_PEOPLE=['duanni','alan'];
+const FIXED_PEOPLE=['duanni','alan','ronaldo']; // têm páginas hardcoded; demais são dinâmicas
+function isProtectedPerson(p){return PROTECTED_PEOPLE.includes((p||'').toLowerCase());}
+function getDynamicPeople(){return (DATA.pessoas||[]).filter(p=>!FIXED_PEOPLE.includes(p));}
+function getAllPersonalPages(){
+  const pages={};
+  (DATA.pessoas||[]).forEach(p=>{if(FIXED_PEOPLE.includes(p))pages[p]=`page-${p}`;else pages[p]=`page-${p}`;});
+  pages.apto='page-apto';
+  return pages;
+}
+function isPersonalPage(pageId){
+  if(pageId==='page-apto')return true;
+  const m=pageId&&pageId.match(/^page-(.+)$/);
+  if(!m)return false;
+  return (DATA.pessoas||[]).includes(m[1]);
+}
+function ensureDynamicPersonPages(){
+  const container=document.getElementById('dynamicPersonPages');if(!container)return;
+  const dyn=getDynamicPeople();
+  const existing=Array.from(container.querySelectorAll('.page')).map(el=>el.id);
+  const desired=dyn.map(p=>`page-${p}`);
+  // Remove pages that no longer correspond to any person
+  existing.forEach(id=>{if(!desired.includes(id)){const el=document.getElementById(id);if(el)el.remove();}});
+  // Add missing pages
+  dyn.forEach(p=>{
+    const pageId=`page-${p}`;
+    if(document.getElementById(pageId))return;
+    const div=document.createElement('div');
+    div.className='page';
+    div.id=pageId;
+    const cap=capitalize(p);
+    div.innerHTML=`
+      <div class="page-header"><h1 class="page-title">${cap}</h1><div class="month-selector"><button onclick="changeMonth(-1)">◀</button><span class="month-label"></span><button onclick="changeMonth(1)">▶</button></div></div>
+      <div class="summary-bubbles summary-bubbles-single" id="${p}Summary"></div>
+      <div class="card"><div class="card-title">Despesas do Cartão</div><div class="table-wrap"><table><thead><tr><th>Descrição</th><th>Parc</th><th>Valor</th></tr></thead><tbody id="${p}CartaoBody"></tbody></table></div></div>
+      <div id="${p}AddCardContainer" style="margin-top:20px;"></div>`;
+    container.appendChild(div);
+  });
+}
+function renderDynamicPersonPage(person){
+  const sumEl=document.getElementById(`${person}Summary`);
+  const bodyEl=document.getElementById(`${person}CartaoBody`);
+  if(!sumEl||!bodyEl)return;
+  renderManualCardsContainer(`${person}AddCardContainer`,person);
+  const ct=getPersonCartaoTotal(person,currentMonth);
+  const manT=getManualCardsTotal(person,currentMonth);
+  const total=ct+manT;
+  const cd=DATA.cartoesBanco.map(c=>{const t=getPersonCartaoTotalByCard(person,currentMonth,c);return t>0?`${c}: ${formatMoney(t)}`:''}).filter(Boolean).join('<br>');
+  // Cor da bubble: rotaciona entre purple/pink/orange/green para cada pessoa dinâmica
+  const colorMap={rick:'bubble-purple'};
+  const dynColors=['bubble-purple','bubble-pink','bubble-orange','bubble-green'];
+  const dynList=getDynamicPeople();
+  const colorCls=colorMap[person]||dynColors[dynList.indexOf(person)%dynColors.length];
+  sumEl.innerHTML=`<div class="bubble ${colorCls}" style="text-align:center;padding:20px;"><div class="bubble-label">Total do Mês</div><div class="bubble-value" style="font-size:28px;">${formatMoney(total)}</div><div class="bubble-sub">${cd}</div></div>`;
+  bodyEl.innerHTML=(DATA.cartao||[]).filter(e=>isExpenseInMonth(e,currentMonth)&&e.quemPaga&&e.quemPaga.includes(person)).map(e=>`<tr><td>${e.descricao||e.loja||''}</td><td>${getParcelaLabel(e,currentMonth)}</td><td><strong>${formatMoney(getPersonShare(e,person))}</strong></td></tr>`).join('');
+}
+function renderAllDynamicPersonPages(){
+  ensureDynamicPersonPages();
+  getDynamicPeople().forEach(p=>renderDynamicPersonPage(p));
+  // refresh month label on dynamic pages
+  setMonthInputs(currentMonth);
+}
+
 // ===== APTO =====
 function getAptoItems(month){return(DATA.apto||{})[month]||[];}
 function setAptoItems(month,items){if(!DATA.apto)DATA.apto={};DATA.apto[month]=items;}
@@ -1565,17 +1637,22 @@ function getManualCardsTotal(person,month){return getManualCardsForMonth(person,
 function renderManualCardsContainer(containerId,person){
   const c=document.getElementById(containerId);if(!c)return;
   const items=getManualCardsForMonth(person,currentMonth);
-  let html=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;"><span style="font-family:var(--font-display);font-weight:700;font-size:13px;"></span><button class="btn btn-outline btn-sm" onclick="openAddCardModal('${person}')"> Adicionar Card</button></div>`;
+  let html='';
   if(items.length){
     html+=items.map(i=>`<div class="card" style="margin-bottom:8px;padding:12px 14px;display:flex;align-items:center;gap:10px;"><div style="width:32px;height:32px;border-radius:var(--radius-xs);background:${i.op==='soma'?'rgba(0,184,148,0.1)':'rgba(214,48,49,0.1)'};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">${i.op==='soma'?'➕':'➖'}</div><div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:12px;">${i.descricao}</div><div style="font-size:10px;color:var(--text-secondary);">${i.op==='soma'?'Soma ao total':'Subtrai do total'}</div></div><div style="font-weight:700;font-size:14px;color:${i.op==='subtrai'?'var(--danger)':'var(--success)'};">${i.op==='subtrai'?'-':'+'} ${formatMoney(i.valor)}</div><div style="display:flex;gap:3px;"><button class="btn-icon" onclick="openAddCardModal('${person}','${i.id}')">✎</button><button class="btn-icon" onclick="deleteManualCard('${person}','${i.id}')" style="color:var(--danger)">✕</button></div></div>`).join('');
   }
+  html+=`<div style="display:flex;align-items:center;gap:10px;margin-top:${items.length?'10px':'0'};"><span style="font-family:var(--font-display);font-weight:700;font-size:13px;"></span><button class="btn btn-outline btn-sm" onclick="openAddCardModal('${person}')"> Adicionar Card</button></div>`;
   c.innerHTML=html;
 }
 
 // ===== CONFIG =====
 function renderConfig(){
   const pe=document.getElementById('configPessoas');
-  if(pe)pe.innerHTML=DATA.pessoas.map((p,i)=>`<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;"><input type="text" value="${capitalize(p)}" onchange="updatePessoa(${i},this.value)" style="flex:1;padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius-xs);font-size:12px;"></div>`).join('');
+  if(pe)pe.innerHTML=DATA.pessoas.map((p,i)=>{
+    const protected_=isProtectedPerson(p);
+    const deleteBtn=protected_?`<span class="btn-icon" style="opacity:0.3;cursor:not-allowed;" title="Perfil fixo (não pode ser removido)">🔒</span>`:`<button class="btn-icon" onclick="deletePessoa(${i})" style="color:var(--danger)" title="Remover perfil">✕</button>`;
+    return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;"><input type="text" value="${capitalize(p)}" onchange="updatePessoa(${i},this.value)" style="flex:1;padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius-xs);font-size:12px;">${deleteBtn}</div>`;
+  }).join('');
   const ce=document.getElementById('configCartoes');
   if(ce)ce.innerHTML=DATA.cartoesBanco.map((c,i)=>`<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;"><input type="text" value="${c}" onchange="updateCartao(${i},this.value)" style="flex:1;padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius-xs);font-size:12px;"><button class="btn-icon" onclick="deleteCartao(${i})" style="color:var(--danger)">✕</button></div>`).join('');
   const dc=document.getElementById('diaCorte');if(dc)dc.value=DATA.diaCorte||8;
@@ -1590,8 +1667,45 @@ function renderConfig(){
   const dv=document.getElementById('configDivisao');
   if(dv)dv.innerHTML=Object.entries(DATA.divisao||{}).map(([p,pct])=>`<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;"><span style="width:70px;font-weight:600;font-size:13px;">${capitalize(p)}</span><input type="number" value="${pct}" min="0" max="100" class="divisao-input" data-person="${p}" style="width:70px;padding:5px;border:1px solid var(--border);border-radius:var(--radius-xs);"><span>%</span></div>`).join('');
 }
-function addPessoa(){const n=document.getElementById('newPessoaName').value.trim().toLowerCase();if(!n)return;if(!DATA.pessoas.includes(n))DATA.pessoas.push(n);document.getElementById('newPessoaName').value='';scheduleSave();renderConfig();showToast('Adicionada');}
-function updatePessoa(idx,v){const old=DATA.pessoas[idx];DATA.pessoas[idx]=v.toLowerCase();(DATA.cartao||[]).forEach(e=>{if(e.quemPaga)e.quemPaga=e.quemPaga.map(p=>p===old?v.toLowerCase():p);});scheduleSave();}
+function addPessoa(){const n=document.getElementById('newPessoaName').value.trim().toLowerCase();if(!n)return;if(!DATA.pessoas.includes(n))DATA.pessoas.push(n);document.getElementById('newPessoaName').value='';scheduleSave();renderAll();showToast('Adicionada');}
+function deletePessoa(idx){
+  const p=DATA.pessoas[idx];if(!p)return;
+  if(isProtectedPerson(p)){showToast('Perfil fixo','error');return;}
+  // Conta dependências para mostrar aviso adequado
+  const cartoesQtd=(DATA.cartao||[]).filter(e=>e.quemPaga&&e.quemPaga.includes(p)).length;
+  const manualQtd=((DATA.manualCards||{})[p]||[]).length;
+  const pessoalQtd=(DATA.pessoal||[]).filter(e=>e.pessoa===p).length;
+  const total=cartoesQtd+manualQtd+pessoalQtd;
+  let msg=`Remover perfil "${capitalize(p)}"?`;
+  if(total>0){msg+=`\n\nIsso vai apagar:\n• ${cartoesQtd} despesa(s) do cartão associada(s)\n• ${manualQtd} card(s) manual(is)\n• ${pessoalQtd} despesa(s) pessoal(is)\n\nEssa ação não pode ser desfeita.`;}
+  if(!confirm(msg))return;
+  // Remove pessoa de todas as listas de quemPaga; se ficar vazio, remove a despesa
+  DATA.cartao=(DATA.cartao||[]).map(e=>{if(e.quemPaga&&e.quemPaga.includes(p))e.quemPaga=e.quemPaga.filter(x=>x!==p);return e;}).filter(e=>!e.quemPaga||e.quemPaga.length>0);
+  // Remove cards manuais
+  if(DATA.manualCards&&DATA.manualCards[p])delete DATA.manualCards[p];
+  // Remove despesas pessoais
+  DATA.pessoal=(DATA.pessoal||[]).filter(e=>e.pessoa!==p);
+  // Remove da lista de divisão (se houver)
+  if(DATA.divisao&&DATA.divisao[p]!==undefined)delete DATA.divisao[p];
+  // Remove da lista de pessoas
+  DATA.pessoas.splice(idx,1);
+  // Se a página atual era a dela, volta pra Pessoal
+  if(currentPage===`page-${p}`){navigateTo('page-pessoal');}
+  scheduleSave();renderAll();showToast('Perfil removido');
+}
+function updatePessoa(idx,v){
+  const old=DATA.pessoas[idx];
+  const novo=(v||'').toLowerCase().trim();
+  if(!novo||novo===old){renderConfig();return;}
+  if(DATA.pessoas.includes(novo)){showToast('Nome já existe','error');renderConfig();return;}
+  DATA.pessoas[idx]=novo;
+  (DATA.cartao||[]).forEach(e=>{if(e.quemPaga)e.quemPaga=e.quemPaga.map(p=>p===old?novo:p);});
+  if(DATA.manualCards&&DATA.manualCards[old]){DATA.manualCards[novo]=DATA.manualCards[old];delete DATA.manualCards[old];}
+  (DATA.pessoal||[]).forEach(e=>{if(e.pessoa===old)e.pessoa=novo;});
+  if(DATA.divisao&&DATA.divisao[old]!==undefined){DATA.divisao[novo]=DATA.divisao[old];delete DATA.divisao[old];}
+  if(currentPage===`page-${old}`)currentPage=`page-${novo}`;
+  scheduleSave();renderAll();
+}
 function updateCartao(idx,novoNome){const novoNomeLower=novoNome.toLowerCase().trim();if(!novoNomeLower){renderConfig();return;}const nomeAntigo=DATA.cartoesBanco[idx];if(nomeAntigo===novoNomeLower)return;DATA.cartoesBanco[idx]=novoNomeLower;(DATA.cartao||[]).forEach(e=>{if(e.cartao===nomeAntigo)e.cartao=novoNomeLower;});if(currentCartao===nomeAntigo)currentCartao=novoNomeLower;showToast('Cartão atualizado');scheduleSave();renderAll();}
 function addCartao(){const n=document.getElementById('newCartaoName').value.trim();if(!n)return;if(!DATA.cartoesBanco.includes(n))DATA.cartoesBanco.push(n);document.getElementById('newCartaoName').value='';scheduleSave();renderAll();showToast('Adicionado');}
 function deleteCartao(idx){const n=DATA.cartoesBanco[idx];if(!confirm(`Excluir "${n}"?`))return;DATA.cartoesBanco.splice(idx,1);DATA.cartao=(DATA.cartao||[]).filter(e=>e.cartao!==n);if(currentCartao===n)currentCartao=DATA.cartoesBanco[0]||'';scheduleSave();renderAll();}
