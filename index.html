@@ -485,8 +485,8 @@ tbody tr:last-child td { border-bottom:none; }
           <div class="form-group"><label>Valor</label><input type="number" id="simValor"></div>
         </div>
         <div class="form-row form-row-2">
-          <div class="form-group"><label>Parcelas</label><input type="number" id="simParcelas" value="1"></div>
-          <div class="form-group"><label>Meses</label><input type="number" id="simMeses" value="6"></div>
+          <div class="form-group"><label>Parcelas</label><input type="number" id="simParcelas" value="1" min="1"></div>
+          <div class="form-group"><label>Meses para analisar</label><input type="number" id="simMeses" value="6" min="1"></div>
         </div>
         <div style="display:flex;gap:6px;"><button class="btn btn-secondary" onclick="runSimulation()">Simular</button><button class="btn btn-outline" onclick="saveSimulation()">Salvar</button></div>
       </div>
@@ -1278,19 +1278,80 @@ function saveReceitaMensal(){DATA.receitaMensal=parseFloat(document.getElementBy
 
 // ===== RENDER: SIMULAR =====
 function renderDuanniSimular(){const c=document.getElementById('savedSims');if(!DATA.simulacoes||!DATA.simulacoes.length){c.innerHTML='<p style="color:var(--text-secondary);font-size:12px;">Nenhuma</p>';return;}c.innerHTML=DATA.simulacoes.map(s=>`<div class="expense-item"><div class="ei-info"><div class="ei-name">${s.nome}</div><div class="ei-detail">${formatMoney(s.valor)} em ${s.parcelas}x</div></div><button class="btn-icon" onclick="deleteSim('${s.id}')" style="color:var(--danger)">✕</button></div>`).join('');}
-function runSimulation(){const nome=document.getElementById('simNome').value||'Compra';const valor=parseFloat(document.getElementById('simValor').value)||0;const parcelas=parseInt(document.getElementById('simParcelas').value)||1;const meses=parseInt(document.getElementById('simMeses').value)||parcelas;if(valor<=0)return showToast('Valor','error');const pm=valor/parcelas;const receita=DATA.receitaMensal||0;const rows=[];const[sy,sm]=currentMonth.split('-').map(Number);const totalMeses=Math.max(meses,parcelas);for(let i=0;i<totalMeses;i++){const d=new Date(sy,sm-1+i,1);const m=d.toISOString().slice(0,7);const ct=getPersonCartaoTotal('duanni',m);const at=getPersonAptoShare('duanni',m);const pe=getPersonalExpensesForMonth('duanni',m).filter(e=>!e._metaRef).reduce((s,e)=>s+getMonthValue(e),0);const sem=receita-(ct+at+pe);const extra=i<parcelas?pm:0;rows.push({m,sem,com:sem-extra,extra});}
-  // Find best month to START buying: the start offset where the worst monthly saldo during the parcela window is highest
-  // Each row independently shows "if I buy starting THIS month"
-  rows.forEach(r=>{r.com=r.sem-pm;r.extra=pm;});
-  // Best month = highest saldo after first installment
-  let bestIdx=0;let bestVal=-Infinity;
-  rows.forEach((r,i)=>{if(r.com>bestVal){bestVal=r.com;bestIdx=i;}});
+function runSimulation(){
+  const nome=document.getElementById('simNome').value||'Compra';
+  const valor=parseFloat(document.getElementById('simValor').value)||0;
+  const parcelas=parseInt(document.getElementById('simParcelas').value)||1;
+  const meses=parseInt(document.getElementById('simMeses').value)||6;
+  if(valor<=0)return showToast('Valor','error');
+  if(parcelas<=0||meses<=0)return showToast('Preencha parcelas e meses','error');
+
+  const pm=valor/parcelas;
+  const receita=DATA.receitaMensal||0;
+  const rows=[];
+  const[sy,sm]=currentMonth.split('-').map(Number);
+  const totalMeses=meses; // respeita exatamente o período que você pediu para visualizar
+
+  for(let i=0;i<totalMeses;i++){
+    const d=new Date(sy,sm-1+i,1);
+    const m=d.toISOString().slice(0,7);
+    const ct=getPersonCartaoTotal('duanni',m);
+    const at=getPersonAptoShare('duanni',m);
+    const pe=getPersonalExpensesForMonth('duanni',m).filter(e=>!e._metaRef).reduce((s,e)=>s+getMonthValue(e),0);
+    const sem=receita-(ct+at+pe);
+    rows.push({m,sem,parcela:pm,com:sem-pm});
+  }
+
+  // A sugestão não pega simplesmente o último/penúltimo mês.
+  // Ela procura o mês mais próximo cuja média de saldo, durante o período simulado,
+  // fique dentro de uma margem aceitável em relação ao melhor cenário.
+  function saldoSemDoMes(offset){
+    const d=new Date(sy,sm-1+offset,1);
+    const m=d.toISOString().slice(0,7);
+    const ct=getPersonCartaoTotal('duanni',m);
+    const at=getPersonAptoShare('duanni',m);
+    const pe=getPersonalExpensesForMonth('duanni',m).filter(e=>!e._metaRef).reduce((s,e)=>s+getMonthValue(e),0);
+    return receita-(ct+at+pe);
+  }
+
+  const candidatos=[];
+  for(let inicio=0;inicio<totalMeses;inicio++){
+    let saldos=[];
+    for(let k=0;k<parcelas;k++){
+      saldos.push(saldoSemDoMes(inicio+k)-pm);
+    }
+    const media=saldos.reduce((a,b)=>a+b,0)/saldos.length;
+    const pior=Math.min(...saldos);
+    candidatos.push({idx:inicio,media,pior});
+  }
+
+  const melhorMedia=Math.max(...candidatos.map(c=>c.media));
+  const margem=Math.max(pm*0.25,50); // tolerância para escolher um mês mais próximo sem fugir muito da melhor média
+  const viaveis=candidatos.filter(c=>c.media>=melhorMedia-margem);
+  const best=viaveis.length?viaveis[0]:candidatos.sort((a,b)=>b.media-a.media)[0];
+  const bestIdx=best.idx;
+
   let html=`<div class="card-title">Simulação: ${nome}</div>`;
-  html+=`<div style="background:rgba(0,184,148,0.08);border:1px solid rgba(0,184,148,0.15);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--success);font-weight:600;">🏆 Melhor mês para comprar: <strong>${rows[bestIdx].m}</strong> — saldo após compra: ${formatMoney(bestVal)}</div>`;
-  html+=`<div class="table-wrap"><table><thead><tr><th>Mês</th><th>Parcela</th><th>Sem</th><th>Com</th><th>Impacto</th></tr></thead><tbody>`;
-  rows.forEach((r,i)=>{const isBest=i===bestIdx;html+=`<tr style="${isBest?'background:rgba(0,184,148,0.06);font-weight:700;':''}" ><td>${r.m}${isBest?' 🏆':''}</td><td>${formatMoney(r.extra)}</td><td>${formatMoney(r.sem)}</td><td>${formatMoney(r.com)}</td><td style="color:var(--danger)">-${formatMoney(r.extra)}</td></tr>`;});
-  html+='</tbody></table></div>';const res=document.getElementById('simResult');res.innerHTML=html;res.classList.remove('hidden');}
-function saveSimulation(){const nome=document.getElementById('simNome').value||'Compra';const valor=parseFloat(document.getElementById('simValor').value)||0;const parcelas=parseInt(document.getElementById('simParcelas').value)||1;if(valor<=0)return showToast('Valor','error');if(!DATA.simulacoes)DATA.simulacoes=[];DATA.simulacoes.push({id:uid(),nome,valor,parcelas});scheduleSave();renderDuanniSimular();showToast('Salva');}
+  html+=`<div style="background:rgba(0,184,148,0.08);border:1px solid rgba(0,184,148,0.15);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--success);font-weight:600;">🏆 Mês indicado: <strong>${rows[bestIdx].m}</strong><br><span style="font-weight:500;color:var(--text-secondary);">Parcela de ${formatMoney(pm)} por ${parcelas}x · analisando ${meses} mês(es)</span></div>`;
+  html+=`<div class="table-wrap"><table><thead><tr><th>Mês</th><th>Parcela</th><th>Saldo sem compra</th><th>Saldo com compra</th><th>Impacto</th></tr></thead><tbody>`;
+  rows.forEach((r,i)=>{
+    const isBest=i===bestIdx;
+    html+=`<tr style="${isBest?'background:rgba(0,184,148,0.06);font-weight:700;':''}" ><td>${r.m}${isBest?' 🏆':''}</td><td>${formatMoney(pm)}</td><td>${formatMoney(r.sem)}</td><td>${formatMoney(r.com)}</td><td style="color:var(--danger)">-${formatMoney(pm)}</td></tr>`;
+  });
+  html+='</tbody></table></div>';
+  const res=document.getElementById('simResult');
+  res.innerHTML=html;
+  res.classList.remove('hidden');
+}
+function saveSimulation(){
+  const nome=document.getElementById('simNome').value||'Compra';
+  const valor=parseFloat(document.getElementById('simValor').value)||0;
+  const parcelas=parseInt(document.getElementById('simParcelas').value)||1;
+  if(valor<=0)return showToast('Valor','error');
+  if(!DATA.simulacoes)DATA.simulacoes=[];
+  DATA.simulacoes.push({id:uid(),nome,valor,parcelas});
+  scheduleSave();renderDuanniSimular();showToast('Salva');
+}
 function deleteSim(id){DATA.simulacoes=(DATA.simulacoes||[]).filter(s=>s.id!==id);scheduleSave();renderDuanniSimular();}
 
 // ===== RENDER: CONTROLE =====
