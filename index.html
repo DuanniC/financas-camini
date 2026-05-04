@@ -79,10 +79,10 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); min-
 .card-title { font-family:var(--font-display); font-weight:700; font-size:15px; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
 
 /* ===== CREDIT CARD VISUAL — INCREASED SIZE ===== */
-.cards-row { display:flex; gap:16px; overflow-x:auto; padding:12px 8px 16px; margin-bottom:16px; scroll-padding:8px; }
-.credit-card { width:300px; min-width:300px; height:180px; border-radius:16px; padding:20px; color:#fff; position:relative; overflow:hidden; cursor:pointer; transition:transform 0.3s, box-shadow 0.3s; flex-shrink:0; }
+.cards-row { display:flex; gap:16px; overflow-x:auto; overflow-y:visible; padding:14px 8px 38px; margin-bottom:0; scroll-padding:8px; }
+.credit-card { width:300px; min-width:300px; height:180px; border-radius:16px; padding:20px; color:#fff; position:relative; overflow:visible; cursor:pointer; transition:transform 0.3s, box-shadow 0.3s; flex-shrink:0; }
 .credit-card:hover { transform:translateY(-4px); box-shadow:0 12px 30px rgba(0,0,0,0.2); }
-.credit-card.active { outline:3px solid var(--accent); outline-offset:3px; }
+.credit-card.active { outline:3px solid var(--accent); outline-offset:3px; box-shadow:0 10px 28px rgba(232,67,147,0.22); }
 .credit-card .cc-pattern { position:absolute; top:0; left:0; right:0; bottom:0; opacity:0.12; background:repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.1) 20px, rgba(255,255,255,0.1) 40px); pointer-events:none; }
 .credit-card .cc-chip { width:36px; height:26px; background:rgba(255,255,255,0.3); border-radius:5px; margin-bottom:14px; }
 .credit-card .cc-number { font-size:12px; letter-spacing:2px; opacity:0.8; margin-bottom:6px; }
@@ -295,7 +295,7 @@ tbody tr:last-child td { border-bottom:none; }
   .summary-bubbles { grid-template-columns:1fr 1fr; }
   .summary-bubbles .bubble:last-child:nth-child(odd) { grid-column: 1 / -1; }
   /* === CARTÕES MOBILE: grid 2 colunas, formato compacto === */
-  .cards-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:4px 0 16px; margin:0; overflow:visible; }
+  .cards-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:6px 0 34px; margin:0; overflow:visible; }
   .credit-card { width:100%; min-width:0; height:140px; border-radius:22px; padding:14px; }
   .credit-card .cc-chip { width:26px; height:19px; margin-bottom:0; position:absolute; bottom:36px; left:14px; }
   .credit-card .cc-number { display:none; }
@@ -405,7 +405,7 @@ tbody tr:last-child td { border-bottom:none; }
         <button onclick="changeMonth(1)">▶</button>
       </div>
     </div>
-    <div class="cards-row" id="cardsRow" style="padding:10px 6px 16px;"></div>
+    <div class="cards-row" id="cardsRow"></div>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
       <div class="filter-row" id="personFilter" style="margin-bottom:0;"></div>
       <button class="btn btn-primary" onclick="openExpenseModal()" style="margin-left:auto;">＋ Nova Despesa</button>
