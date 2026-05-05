@@ -321,6 +321,19 @@ tbody tr:last-child td { border-bottom:none; }
   .summary-bubbles .bubble:last-child:nth-child(odd) { grid-column: 1; }
   .form-row-2 { grid-template-columns:1fr; }
 }
+
+/* ===== METAS: seleção e edição ===== */
+.meta-selectable { cursor:pointer; border-radius:var(--radius-sm); padding:8px; margin:-8px 0 8px; transition:all .2s; border:1px solid transparent; }
+.meta-selectable:hover { background:rgba(108,92,231,0.04); border-color:var(--border); }
+.meta-selectable.active { background:linear-gradient(135deg, rgba(232,67,147,0.08), rgba(108,92,231,0.08)); border-color:rgba(232,67,147,0.25); }
+.meta-actions { display:flex; gap:4px; align-items:center; }
+.meta-empty-hint { color:var(--text-secondary); font-size:12px; padding:10px 2px; }
+.meta-emoji { font-size:18px; width:32px; height:32px; border-radius:var(--radius-xs); display:flex; align-items:center; justify-content:center; background:rgba(253,203,110,0.2); flex-shrink:0; }
+.meta-name-row { display:flex; gap:8px; align-items:center; }
+.meta-emoji-input { width:44px !important; min-width:44px; height:38px; text-align:center; font-size:20px !important; padding:6px !important; border:1px solid var(--border); border-radius:var(--radius-xs); background:var(--card-bg); }
+.meta-emoji-input:focus { outline:none; border-color:var(--accent); }
+.meta-name-row #metaNome { flex:1; min-width:0; }
+
 </style>
 </head>
 <body>
@@ -451,21 +464,43 @@ tbody tr:last-child td { border-bottom:none; }
     </div>
     <div class="sub-page" id="duanni-meta">
       <div class="summary-bubbles" id="metaSummary"></div>
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-title">Minhas Metas</div>
+        <div id="metaList"></div>
+      </div>
       <div class="expandable" id="metaConfigSection">
-        <div class="expandable-header" onclick="toggleExpandable(this)">Configurar Valor Alvo <span class="exp-arrow">▼</span></div>
+        <div class="expandable-header" onclick="toggleExpandable(this)">Adicionar Nova Meta <span class="exp-arrow">▼</span></div>
         <div class="expandable-body">
-          <div class="form-group"><label>Valor Alvo (R$)</label><input type="number" id="metaAlvo" placeholder="10000"></div>
-          <button class="btn btn-primary" onclick="saveMetaConfig()">Salvar</button>
+          <input type="hidden" id="metaEditId" value="">
+          <div class="form-row form-row-2">
+            <div class="form-group">
+              <label>Nome da Meta</label>
+              <div class="meta-name-row">
+                <input type="text" id="metaEmoji" class="meta-emoji-input" maxlength="2" placeholder="🎯" inputmode="text" autocomplete="off" aria-label="Emoji da meta">
+                <input type="text" id="metaNome" placeholder="Ex: Viagem, reserva, apartamento">
+              </div>
+            </div>
+            <div class="form-group"><label>Valor Alvo (R$)</label><input type="number" id="metaAlvo" placeholder="10000"></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-primary" id="metaSaveBtn" onclick="saveMetaConfig()">Adicionar Meta</button>
+            <button class="btn btn-outline hidden" id="metaCancelEditBtn" onclick="cancelMetaEdit()">Cancelar edição</button>
+          </div>
         </div>
       </div>
       <div class="expandable" id="metaAporteSection">
         <div class="expandable-header" onclick="toggleExpandable(this)">Adicionar Aporte <span class="exp-arrow">▼</span></div>
         <div class="expandable-body">
-          <div class="form-row form-row-2">
+          <input type="hidden" id="metaAporteEditId" value="">
+          <div class="form-row form-row-3">
+            <div class="form-group"><label>Meta</label><select id="metaAporteSelect"></select></div>
             <div class="form-group"><label>Valor (R$)</label><input type="number" id="metaAporteValor" placeholder="500"></div>
             <div class="form-group"><label>Data</label><input type="date" id="metaAporteData"></div>
           </div>
-          <button class="btn btn-primary" onclick="addAporte()">Adicionar Aporte</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-primary" id="metaAporteBtn" onclick="addAporte()">Adicionar Aporte</button>
+            <button class="btn btn-outline hidden" id="metaCancelAporteEditBtn" onclick="cancelAporteEdit()">Cancelar edição</button>
+          </div>
         </div>
       </div>
       <div class="expandable" id="metaHistSection">
@@ -1223,47 +1258,226 @@ function renderDuanniInicio(){
 }
 
 // ===== RENDER: META =====
+function ensureMetasMigrated(){
+  if(!DATA.customData)DATA.customData=[];
+  const hasNovaMeta=DATA.customData.some(d=>d.key==='metaItem');
+  const legacyCfg=DATA.customData.find(d=>d.key==='metaAlvo');
+  const legacyAportes=DATA.customData.filter(d=>d.key==='aporte'&&!d.metaId);
+  if(!hasNovaMeta&&(legacyCfg||legacyAportes.length)){
+    const legacyId='meta_legacy';
+    DATA.customData.push({key:'metaItem',id:legacyId,nome:'Meta principal',alvo:(legacyCfg&&legacyCfg.value)||0,emoji:'🎯'});
+    DATA.customData.forEach(d=>{if(d.key==='aporte'&&!d.metaId)d.metaId=legacyId;});
+    scheduleSave();
+  }else if(hasNovaMeta&&legacyAportes.length){
+    const first=DATA.customData.find(d=>d.key==='metaItem');
+    DATA.customData.forEach(d=>{if(d.key==='aporte'&&!d.metaId)d.metaId=first.id;});
+    scheduleSave();
+  }
+}
+function getMetas(){ensureMetasMigrated();return (DATA.customData||[]).filter(d=>d.key==='metaItem');}
+function getAportes(){ensureMetasMigrated();return (DATA.customData||[]).filter(d=>d.key==='aporte');}
+function getSelectedMetaId(){const row=(DATA.customData||[]).find(d=>d.key==='metaSelecionada');return row?row.value:'';}
+function setSelectedMetaId(id){
+  if(!DATA.customData)DATA.customData=[];
+  let row=DATA.customData.find(d=>d.key==='metaSelecionada');
+  if(!row){row={key:'metaSelecionada',value:id};DATA.customData.push(row);}else row.value=id;
+  scheduleSave();renderDuanniMeta();
+}
+function getSelectedMeta(){
+  const metas=getMetas();
+  const id=getSelectedMetaId();
+  return metas.find(m=>m.id===id)||null;
+}
+function getMetaEmoji(meta){return (meta&&meta.emoji)||'🎯';}
+function selectMetaEmoji(emoji){
+  const input=document.getElementById('metaEmoji');
+  if(input) input.value=emoji||'🎯';
+}
+function bindMetaEmojiInput(){
+  const input=document.getElementById('metaEmoji');
+  if(!input || input.dataset.bound==='1') return;
+  input.dataset.bound='1';
+  input.addEventListener('input',()=>{
+    if(input.value.length>2) input.value=input.value.slice(0,2);
+  });
+}
+function resetMetaForms(keepSelected=false){
+  const metaEdit=document.getElementById('metaEditId'); if(metaEdit)metaEdit.value='';
+  const nome=document.getElementById('metaNome'); if(nome)nome.value='';
+  const alvo=document.getElementById('metaAlvo'); if(alvo)alvo.value='';
+  selectMetaEmoji('🎯');
+  const saveBtn=document.getElementById('metaSaveBtn'); if(saveBtn)saveBtn.textContent='Adicionar Meta';
+  const cancelBtn=document.getElementById('metaCancelEditBtn'); if(cancelBtn)cancelBtn.classList.add('hidden');
+  const aporteEdit=document.getElementById('metaAporteEditId'); if(aporteEdit)aporteEdit.value='';
+  const valor=document.getElementById('metaAporteValor'); if(valor)valor.value='';
+  const data=document.getElementById('metaAporteData'); if(data)data.value=new Date().toISOString().slice(0,10);
+  const aporteBtn=document.getElementById('metaAporteBtn'); if(aporteBtn)aporteBtn.textContent='Adicionar Aporte';
+  const cancelAporte=document.getElementById('metaCancelAporteEditBtn'); if(cancelAporte)cancelAporte.classList.add('hidden');
+}
 function renderDuanniMeta(){
   if(!DATA.customData)DATA.customData=[];
-  const cfg=DATA.customData.find(d=>d.key==='metaAlvo')||{value:0};
-  const aportes=DATA.customData.filter(d=>d.key==='aporte');
-  const totalG=aportes.reduce((s,a)=>s+(a.valor||0),0);
-  const alvo=cfg.value||0;
-  const pct=alvo>0?Math.min(100,totalG/alvo*100):0;
-  const falta=alvo>totalG?alvo-totalG:0;
-  document.getElementById('metaAlvo').value=alvo||'';
-  let prev='—';
-  if(aportes.length>=2&&alvo>totalG){const avg=totalG/aportes.length;const rest=alvo-totalG;const m=Math.ceil(rest/avg);const dt=new Date();dt.setMonth(dt.getMonth()+m);prev=dt.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});}
-  
-  // Display meta details
-  document.getElementById('metaSummary').innerHTML=`
-    <div class="bubble bubble-green"><div class="bubble-label">Guardado</div><div class="bubble-value">${formatMoney(totalG)}</div></div>
-    <div class="bubble bubble-purple"><div class="bubble-label">Meta Total</div><div class="bubble-value">${formatMoney(alvo)}</div></div>
-    <div class="bubble bubble-pink"><div class="bubble-label">Falta</div><div class="bubble-value">${formatMoney(falta)}</div></div>
-    <div class="bubble bubble-orange"><div class="bubble-label">Progresso</div><div class="bubble-value">${pct.toFixed(1)}%</div><div class="progress-bar" style="margin-top:6px;"><div class="progress-fill" style="width:${pct}%;background:var(--gradient3);"></div></div></div>
-    <div class="bubble bubble-purple"><div class="bubble-label">Previsão</div><div class="bubble-value" style="font-size:14px;">${prev}</div></div>`;
-  
-  document.getElementById('metaAporteData').value=new Date().toISOString().slice(0,10);
-  document.getElementById('metaHistBody').innerHTML=!aportes.length?'<p style="color:var(--text-secondary);font-size:12px;">Nenhum aporte</p>':
-    aportes.sort((a,b)=>(b.data||'').localeCompare(a.data||'')).map(a=>`<div class="expense-item"><div class="ei-icon cat-poupanca">🏦</div><div class="ei-info"><div class="ei-name">${formatMoney(a.valor)}</div><div class="ei-detail">${a.data||''}</div></div><button class="btn-icon" onclick="deleteAporte('${a.id}')" style="color:var(--danger)">✕</button></div>`).join('');
+  const metas=getMetas();
+  const aportes=getAportes();
+  const selected=getSelectedMeta();
+  const selectedId=selected?selected.id:'';
+
+  const dataInput=document.getElementById('metaAporteData');
+  if(dataInput&&!dataInput.value)dataInput.value=new Date().toISOString().slice(0,10);
+
+  const summary=document.getElementById('metaSummary');
+  if(summary){
+    if(!selected){
+      summary.innerHTML='';
+      summary.classList.add('hidden');
+    }else{
+      const total=aportes.filter(a=>a.metaId===selected.id).reduce((s,a)=>s+(a.valor||0),0);
+      const alvo=selected.alvo||0;
+      const pct=alvo>0?Math.min(100,total/alvo*100):0;
+      const falta=alvo>total?alvo-total:0;
+      summary.classList.remove('hidden');
+      summary.innerHTML=`
+        <div class="bubble bubble-green"><div class="bubble-label">Guardado</div><div class="bubble-value">${formatMoney(total)}</div><div class="bubble-sub">${getMetaEmoji(selected)} ${selected.nome||'Meta'}</div></div>
+        <div class="bubble bubble-purple"><div class="bubble-label">Meta</div><div class="bubble-value">${formatMoney(alvo)}</div></div>
+        <div class="bubble bubble-pink"><div class="bubble-label">Falta</div><div class="bubble-value">${formatMoney(falta)}</div></div>
+        <div class="bubble bubble-orange"><div class="bubble-label">Progresso</div><div class="bubble-value">${pct.toFixed(1)}%</div><div class="progress-bar" style="margin-top:6px;"><div class="progress-fill" style="width:${pct}%;background:var(--gradient3);"></div></div></div>`;
+    }
+  }
+
+  const select=document.getElementById('metaAporteSelect');
+  if(select){
+    select.innerHTML=metas.length?metas.map(m=>`<option value="${m.id}" ${m.id===selectedId?'selected':''}>${getMetaEmoji(m)} ${m.nome||'Meta'} · ${formatMoney(m.alvo||0)}</option>`).join(''):'<option value="">Cadastre uma meta primeiro</option>';
+  }
+
+  const list=document.getElementById('metaList');
+  if(list){
+    if(!metas.length){
+      list.innerHTML='<p class="meta-empty-hint">Nenhuma meta cadastrada ainda. Adicione sua primeira meta abaixo.</p>';
+    }else{
+      list.innerHTML=metas.map(m=>{
+        const total=aportes.filter(a=>a.metaId===m.id).reduce((s,a)=>s+(a.valor||0),0);
+        const alvo=m.alvo||0;
+        const pct=alvo>0?Math.min(100,total/alvo*100):0;
+        const falta=alvo>total?alvo-total:0;
+        const active=m.id===selectedId?'active':'';
+        return `<div class="meta-selectable ${active}" onclick="setSelectedMetaId('${m.id}')">
+          <div class="expense-item" style="align-items:flex-start;border-bottom:none;">
+            <div class="meta-emoji">${getMetaEmoji(m)}</div>
+            <div class="ei-info">
+              <div class="ei-name">${m.nome||'Meta'}</div>
+              <div class="ei-detail">Guardado ${formatMoney(total)} de ${formatMoney(alvo)} · Falta ${formatMoney(falta)}</div>
+              <div class="progress-bar" style="margin-top:7px;"><div class="progress-fill" style="width:${pct}%;background:var(--gradient3);"></div></div>
+            </div>
+            <div class="ei-value">${pct.toFixed(1)}%</div>
+            <div class="meta-actions" onclick="event.stopPropagation()">
+              <button class="btn-icon" onclick="editMeta('${m.id}')" title="Editar">✎</button>
+              <button class="btn-icon" onclick="deleteMeta('${m.id}')" style="color:var(--danger)" title="Excluir">✕</button>
+            </div>
+          </div>
+        </div>`;
+      }).join('')+'<p class="meta-empty-hint">Clique em uma meta para ver os cards, progresso e histórico dela.</p>';
+    }
+  }
+
+  const hist=document.getElementById('metaHistBody');
+  if(hist){
+    if(!selected){
+      hist.innerHTML='<p class="meta-empty-hint">Selecione uma meta para ver e editar os aportes dela.</p>';
+    }else{
+      const histAportes=aportes.filter(a=>a.metaId===selected.id).sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+      hist.innerHTML=!histAportes.length?'<p class="meta-empty-hint">Nenhum aporte nesta meta.</p>':
+        histAportes.map(a=>`<div class="expense-item"><div class="meta-emoji">${getMetaEmoji(selected)}</div><div class="ei-info"><div class="ei-name">${formatMoney(a.valor)}</div><div class="ei-detail">${a.data||''} · ${selected.nome||'Meta'}</div></div><div class="meta-actions"><button class="btn-icon" onclick="editAporte('${a.id}')" title="Editar">✎</button><button class="btn-icon" onclick="deleteAporte('${a.id}')" style="color:var(--danger)" title="Excluir">✕</button></div></div>`).join('');
+    }
+  }
 }
 function saveMetaConfig(){
   if(!DATA.customData)DATA.customData=[];
-  const v=parseFloat(document.getElementById('metaAlvo').value)||0;
-  const idx=DATA.customData.findIndex(d=>d.key==='metaAlvo');
-  if(idx>=0){DATA.customData[idx]={key:'metaAlvo',value:v};}
-  else{DATA.customData.push({key:'metaAlvo',value:v});}
-  saveData().then(()=>{renderDuanniMeta();showToast('Meta salva');});
+  const editId=document.getElementById('metaEditId')?.value||'';
+  const nome=(document.getElementById('metaNome')?.value||'').trim()||'Nova meta';
+  const alvo=parseFloat(document.getElementById('metaAlvo').value)||0;
+  const emoji=(document.getElementById('metaEmoji')?.value||'🎯').trim()||'🎯';
+  if(alvo<=0)return showToast('Informe o valor da meta','error');
+  if(editId){
+    const meta=DATA.customData.find(d=>d.key==='metaItem'&&d.id===editId);
+    if(meta){meta.nome=nome;meta.alvo=alvo;meta.emoji=emoji;}
+    // Atualiza descrição dos lançamentos ligados aos aportes desta meta
+    const aporteIds=DATA.customData.filter(d=>d.key==='aporte'&&d.metaId===editId).map(d=>d.id);
+    (DATA.pessoal||[]).forEach(e=>{if(aporteIds.includes(e._metaRef))e.descricao=`Aporte ${nome}`;});
+    resetMetaForms(true);
+    saveData().then(()=>{renderAll();showToast('Meta atualizada');});
+  }else{
+    const id=uid();
+    DATA.customData.push({key:'metaItem',id,nome,alvo,emoji});
+    setSelectedMetaId(id);
+    resetMetaForms(true);
+    saveData().then(()=>{renderAll();showToast('Meta adicionada');});
+  }
 }
+function editMeta(id){
+  const meta=getMetas().find(m=>m.id===id); if(!meta)return;
+  setSelectedMetaId(id);
+  document.getElementById('metaEditId').value=id;
+  document.getElementById('metaNome').value=meta.nome||'';
+  document.getElementById('metaAlvo').value=meta.alvo||'';
+  selectMetaEmoji(getMetaEmoji(meta));
+  document.getElementById('metaSaveBtn').textContent='Salvar Alterações';
+  document.getElementById('metaCancelEditBtn').classList.remove('hidden');
+  const section=document.getElementById('metaConfigSection');
+  if(section&&!section.classList.contains('open'))section.classList.add('open');
+}
+function cancelMetaEdit(){resetMetaForms(true);renderDuanniMeta();}
 function addAporte(){
-  const valor=parseFloat(document.getElementById('metaAporteValor').value)||0;if(valor<=0)return showToast('Valor','error');
-  const data=document.getElementById('metaAporteData').value;if(!DATA.customData)DATA.customData=[];
-  const aid=uid();DATA.customData.push({key:'aporte',id:aid,valor,data});
+  const metas=getMetas();
+  if(!metas.length)return showToast('Cadastre uma meta primeiro','error');
+  const editId=document.getElementById('metaAporteEditId')?.value||'';
+  const metaId=document.getElementById('metaAporteSelect').value||getSelectedMetaId()||metas[0].id;
+  const meta=metas.find(m=>m.id===metaId)||metas[0];
+  const valor=parseFloat(document.getElementById('metaAporteValor').value)||0;if(valor<=0)return showToast('Informe o valor','error');
+  const data=document.getElementById('metaAporteData').value||new Date().toISOString().slice(0,10);
+  if(!DATA.customData)DATA.customData=[];
+  if(editId){
+    const aporte=DATA.customData.find(d=>d.key==='aporte'&&d.id===editId);
+    if(aporte){aporte.metaId=meta.id;aporte.valor=valor;aporte.data=data;}
+    (DATA.pessoal||[]).forEach(e=>{if(e._metaRef===editId){e.descricao=`Aporte ${meta.nome||'Meta'}`;e.valor=valor;e.mesInicio=data.slice(0,7);e.dia=parseInt(data.slice(8,10))||1;}});
+    setSelectedMetaId(meta.id);
+    cancelAporteEdit(false);
+    scheduleSave();renderAll();showToast('Aporte atualizado');
+    return;
+  }
+  const aid=uid();DATA.customData.push({key:'aporte',id:aid,metaId:meta.id,valor,data});
   if(!DATA.pessoal)DATA.pessoal=[];
-  DATA.pessoal.push({id:uid(),pessoa:'duanni',descricao:'Aporte Meta',valor,tipo:'avista',parcelas:1,mesInicio:data.slice(0,7),dia:parseInt(data.slice(8,10))||1,categoria:'poupanca',banco:'',_metaRef:aid});
+  DATA.pessoal.push({id:uid(),pessoa:'duanni',descricao:`Aporte ${meta.nome||'Meta'}`,valor,tipo:'avista',parcelas:1,mesInicio:data.slice(0,7),dia:parseInt(data.slice(8,10))||1,categoria:'poupanca',banco:'',_metaRef:aid});
+  setSelectedMetaId(meta.id);
   document.getElementById('metaAporteValor').value='';scheduleSave();renderAll();showToast('Aporte adicionado');
 }
-function deleteAporte(id){if(!confirm('Excluir?'))return;DATA.customData=(DATA.customData||[]).filter(d=>d.id!==id);DATA.pessoal=(DATA.pessoal||[]).filter(e=>e._metaRef!==id);scheduleSave();renderAll();}
+function editAporte(id){
+  const aporte=getAportes().find(a=>a.id===id); if(!aporte)return;
+  setSelectedMetaId(aporte.metaId);
+  document.getElementById('metaAporteEditId').value=id;
+  document.getElementById('metaAporteSelect').value=aporte.metaId;
+  document.getElementById('metaAporteValor').value=aporte.valor||'';
+  document.getElementById('metaAporteData').value=aporte.data||new Date().toISOString().slice(0,10);
+  document.getElementById('metaAporteBtn').textContent='Salvar Aporte';
+  document.getElementById('metaCancelAporteEditBtn').classList.remove('hidden');
+  const section=document.getElementById('metaAporteSection');
+  if(section&&!section.classList.contains('open'))section.classList.add('open');
+}
+function cancelAporteEdit(doRender=true){
+  const edit=document.getElementById('metaAporteEditId'); if(edit)edit.value='';
+  const valor=document.getElementById('metaAporteValor'); if(valor)valor.value='';
+  const data=document.getElementById('metaAporteData'); if(data)data.value=new Date().toISOString().slice(0,10);
+  const btn=document.getElementById('metaAporteBtn'); if(btn)btn.textContent='Adicionar Aporte';
+  const cancel=document.getElementById('metaCancelAporteEditBtn'); if(cancel)cancel.classList.add('hidden');
+  if(doRender)renderDuanniMeta();
+}
+function deleteAporte(id){if(!confirm('Excluir este aporte?'))return;DATA.customData=(DATA.customData||[]).filter(d=>d.id!==id);DATA.pessoal=(DATA.pessoal||[]).filter(e=>e._metaRef!==id);scheduleSave();renderAll();}
+function deleteMeta(id){
+  if(!confirm('Excluir esta meta e todos os aportes dela?'))return;
+  const aporteIds=(DATA.customData||[]).filter(d=>d.key==='aporte'&&d.metaId===id).map(d=>d.id);
+  DATA.customData=(DATA.customData||[]).filter(d=>!(d.key==='metaItem'&&d.id===id)&&!(d.key==='aporte'&&d.metaId===id));
+  DATA.pessoal=(DATA.pessoal||[]).filter(e=>!aporteIds.includes(e._metaRef));
+  if(getSelectedMetaId()===id){const row=(DATA.customData||[]).find(d=>d.key==='metaSelecionada');if(row)row.value='';}
+  resetMetaForms(true);scheduleSave();renderAll();showToast('Meta excluída');
+}
 
 // ===== RENDER: PLANEJAMENTO =====
 function renderDuanniPlanejamento(){
@@ -1840,6 +2054,8 @@ function updateCategoriaIcone(idx,v){
 function saveDiaCorte(){DATA.diaCorte=parseInt(document.getElementById('diaCorte').value)||8;scheduleSave();showToast('Salvo');}
 function saveDivisaoConfig(){document.querySelectorAll('.divisao-input').forEach(i=>{DATA.divisao[i.dataset.person]=parseInt(i.value)||0;});scheduleSave();renderApto();showToast('Divisão salva');}
 async function updateSenha(key){const inputId=key==='senha'?'newSenha':'newSenhaConfig';const val=document.getElementById(inputId).value;if(val.length!==4)return showToast('4 dígitos','error');try{const r=await supaFetch(`config?chave=eq.${key}`,{method:'PATCH',body:JSON.stringify({valor:val})});const rows=await r.json();if(!rows||!rows.length)await supaFetch('config',{method:'POST',body:JSON.stringify({chave:key,valor:val})});passwords[key]=val;showToast('Senha atualizada');}catch(e){showToast('Erro','error');}}
+
+setTimeout(bindMetaEmojiInput,0);
 </script>
 </body>
 </html>
