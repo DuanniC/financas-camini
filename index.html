@@ -1494,7 +1494,11 @@ function renderDuanniPlanejamento(){
 function saveReceitaMensal(){DATA.receitaMensal=parseFloat(document.getElementById('receitaMensal').value)||0;scheduleSave();renderDuanniPlanejamento();showToast('Receita salva');}
 
 // ===== RENDER: SIMULAR =====
-function renderDuanniSimular(){const c=document.getElementById('savedSims');if(!DATA.simulacoes||!DATA.simulacoes.length){c.innerHTML='<p style="color:var(--text-secondary);font-size:12px;">Nenhuma</p>';return;}c.innerHTML=DATA.simulacoes.map(s=>`<div class="expense-item"><div class="ei-info"><div class="ei-name">${s.nome}</div><div class="ei-detail">${formatMoney(s.valor)} em ${s.parcelas}x</div></div><button class="btn-icon" onclick="deleteSim('${s.id}')" style="color:var(--danger)">✕</button></div>`).join('');}
+function renderDuanniSimular(){
+  const c=document.getElementById('savedSims');
+  if(!DATA.simulacoes||!DATA.simulacoes.length){c.innerHTML='<p style="color:var(--text-secondary);font-size:12px;">Nenhuma</p>';return;}
+  c.innerHTML=DATA.simulacoes.map(s=>`<div class="expense-item"><div class="ei-info"><div class="ei-name">${s.nome}</div><div class="ei-detail">${formatMoney(s.valor)} em ${s.parcelas}x · ${s.meses||6} mês(es)</div></div><div class="ei-actions"><button class="btn-icon" onclick="viewSim('${s.id}')" title="Ver simulação">👁</button><button class="btn-icon" onclick="deleteSim('${s.id}')" style="color:var(--danger)" title="Excluir">✕</button></div></div>`).join('');
+}
 function runSimulation(){
   const nome=document.getElementById('simNome').value||'Compra';
   const valor=parseFloat(document.getElementById('simValor').value)||0;
@@ -1564,10 +1568,23 @@ function saveSimulation(){
   const nome=document.getElementById('simNome').value||'Compra';
   const valor=parseFloat(document.getElementById('simValor').value)||0;
   const parcelas=parseInt(document.getElementById('simParcelas').value)||1;
+  const meses=parseInt(document.getElementById('simMeses').value)||6;
   if(valor<=0)return showToast('Valor','error');
+  if(parcelas<=0||meses<=0)return showToast('Preencha parcelas e meses','error');
   if(!DATA.simulacoes)DATA.simulacoes=[];
-  DATA.simulacoes.push({id:uid(),nome,valor,parcelas});
+  DATA.simulacoes.push({id:uid(),nome,valor,parcelas,meses});
   scheduleSave();renderDuanniSimular();showToast('Salva');
+}
+function viewSim(id){
+  const s=(DATA.simulacoes||[]).find(x=>x.id===id);
+  if(!s)return showToast('Simulação não encontrada','error');
+  document.getElementById('simNome').value=s.nome||'Compra';
+  document.getElementById('simValor').value=s.valor||'';
+  document.getElementById('simParcelas').value=s.parcelas||1;
+  document.getElementById('simMeses').value=s.meses||6;
+  runSimulation();
+  const res=document.getElementById('simResult');
+  if(res)res.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function deleteSim(id){DATA.simulacoes=(DATA.simulacoes||[]).filter(s=>s.id!==id);scheduleSave();renderDuanniSimular();}
 
