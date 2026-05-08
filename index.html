@@ -711,8 +711,8 @@ tbody tr:last-child td { border-bottom:none; }
     </div>
     <div class="form-group"><label>Tipo</label><select id="expTipo" onchange="onExpTipoChange()"><option value="parcelado">Parcelado</option><option value="recorrente">Recorrente</option><option value="avista">À vista</option></select></div>
     <div class="form-row form-row-3">
-      <div class="form-group"><label>Valor (R$)</label><input type="number" id="expValor" step="0.01"></div>
-      <div class="form-group" id="expParcelasGroup"><label>Parcelas</label><input type="number" id="expParcelas" value="1" min="1" oninput="updateParcelaPreview('exp')"></div>
+      <div class="form-group"><label>Valor (R$)</label><input type="number" id="expValor" step="0.01" oninput="updateExpDivisaoStatus()"></div>
+      <div class="form-group" id="expParcelasGroup"><label>Parcelas</label><input type="number" id="expParcelas" value="1" min="1" oninput="updateParcelaPreview('exp');updateExpDivisaoStatus()"></div>
       <div class="form-group"><label>Mês Início</label><input type="month" id="expMesInicio" oninput="updateParcelaPreview('exp')"></div>
     </div>
     <div id="expParcelaPreview" style="display:none;font-size:12px;color:var(--success);font-weight:600;margin-bottom:12px;padding:6px 10px;background:rgba(0,184,148,0.08);border-radius:var(--radius-xs);"></div>
@@ -967,9 +967,18 @@ function toggleSidebar(){document.getElementById('sidebar').classList.toggle('op
 function toggleExpandable(el){el.closest('.expandable').classList.toggle('open');}
 
 // ===== MONTH =====
+function formatYearMonthLocal(date){return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;}
+function getDefaultMesInicio(){
+  const hoje=new Date();
+  const diaCorte=DATA.diaCorte||8;
+  const mesReferencia=hoje.getDate()>=diaCorte
+    ? new Date(hoje.getFullYear(),hoje.getMonth()+1,1)
+    : new Date(hoje.getFullYear(),hoje.getMonth(),1);
+  return formatYearMonthLocal(mesReferencia);
+}
 function setMonthInputs(m){const monthNames=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];const[y,mo]=m.split('-').map(Number);const label=monthNames[mo-1]+' '+y;document.querySelectorAll('.month-label').forEach(el=>el.textContent=label);}
 function onMonthChange(){setMonthInputs(currentMonth);renderAll();}
-function changeMonth(d){const[y,m]=currentMonth.split('-').map(Number);const dt=new Date(y,m-1+d,1);currentMonth=dt.toISOString().slice(0,7);setMonthInputs(currentMonth);renderAll();}
+function changeMonth(d){const[y,m]=currentMonth.split('-').map(Number);const dt=new Date(y,m-1+d,1);currentMonth=formatYearMonthLocal(dt);setMonthInputs(currentMonth);renderAll();}
 
 // ===== RENDER ALL =====
 function renderAll(){renderCards();renderPersonFilter();renderCartaoTable();renderDuanniInicio();renderDuanniMeta();renderDuanniPlanejamento();renderDuanniSimular();renderDuanniControle();renderAlan();renderRonaldo();renderAllDynamicPersonPages();renderApto();renderConfig();}
@@ -993,7 +1002,16 @@ function isExpenseInMonth(exp,month){
 }
 function getMonthValue(exp){if(exp.tipo==='recorrente'||exp.tipo==='avista')return exp.valor||0;return(exp.valor||0)/(exp.parcelas||1);}
 function getParcelaLabel(exp,month){if(exp.tipo==='recorrente')return'Mensal';if(exp.tipo==='avista')return'À vista';const[cy,cm]=month.split('-').map(Number);const[sy,sm]=(exp.mesInicio||month).split('-').map(Number);return`${(cy*12+cm)-(sy*12+sm)+1}/${exp.parcelas}x`;}
-function getPersonShare(exp,person){if(!exp.quemPaga||!exp.quemPaga.includes(person))return 0;const mv=getMonthValue(exp);if(exp.comoDivide==='fixo'&&exp.divisaoFixa)return exp.divisaoFixa[person]||0;return mv/exp.quemPaga.length;}
+function getPersonShare(exp,person){
+  if(!exp.quemPaga||!exp.quemPaga.includes(person))return 0;
+  const mv=getMonthValue(exp);
+  if(exp.comoDivide==='fixo'&&exp.divisaoFixa){
+    const valorFixoTotal=exp.divisaoFixa[person]||0;
+    if(exp.tipo==='parcelado')return valorFixoTotal/(exp.parcelas||1);
+    return valorFixoTotal;
+  }
+  return mv/exp.quemPaga.length;
+}
 function getMonthExpenses(month,card){return(DATA.cartao||[]).filter(e=>{if(card&&e.cartao!==card)return false;return isExpenseInMonth(e,month);});}
 function getPersonCartaoTotal(person,month){return(DATA.cartao||[]).filter(e=>isExpenseInMonth(e,month)&&e.quemPaga&&e.quemPaga.includes(person)).reduce((s,e)=>s+getPersonShare(e,person),0);}
 function getPersonCartaoTotalByCard(person,month,card){return(DATA.cartao||[]).filter(e=>isExpenseInMonth(e,month)&&e.cartao===card&&e.quemPaga&&e.quemPaga.includes(person)).reduce((s,e)=>s+getPersonShare(e,person),0);}
@@ -1077,7 +1095,7 @@ function renderCartaoTable(){
     let quemCol='';
     if(payers.length===1){quemCol=capitalize(payers[0]);}
     else if(payers.length>1){
-      if(e.comoDivide==='fixo'&&e.divisaoFixa){quemCol=payers.map(p=>`<span style="white-space:nowrap;">${capitalize(p)} <span style="color:var(--text-secondary);font-size:10px;">${formatMoney(e.divisaoFixa[p]||0)}</span></span>`).join(', ');}
+      if(e.comoDivide==='fixo'&&e.divisaoFixa){quemCol=payers.map(p=>`<span style="white-space:nowrap;">${capitalize(p)} <span style="color:var(--text-secondary);font-size:10px;">${formatMoney(getPersonShare(e,p))}</span></span>`).join(', ');}
       else{const each=mv/payers.length;quemCol=payers.map(p=>`<span style="white-space:nowrap;">${capitalize(p)} <span style="color:var(--text-secondary);font-size:10px;">${formatMoney(each)}</span></span>`).join(', ');}
     }
     return`<tr>
@@ -1115,24 +1133,14 @@ function renderCartaoTable(){
 function openExpenseModal(editId){
   document.getElementById('expEditId').value=editId||'';
   document.getElementById('expenseModalTitle').textContent=editId?'Editar Despesa':'Nova Despesa';
-  document.getElementById('expPessoas').innerHTML=DATA.pessoas.map(p=>`<label><input type="checkbox" value="${p}"> ${capitalize(p)}</label>`).join('');
+  document.getElementById('expPessoas').innerHTML=DATA.pessoas.map(p=>`<label><input type="checkbox" value="${p}" onchange="onExpDivisaoChange()"> ${capitalize(p)}</label>`).join('');
   document.getElementById('expCartao').innerHTML=DATA.cartoesBanco.map(c=>`<option value="${c}">${c}</option>`).join('');
   document.getElementById('expCategoria').innerHTML=(DATA.categorias||[]).map(c=>`<option value="${c.id}">${c.icone} ${c.nome}</option>`).join('');
-  if(editId){const exp=DATA.cartao.find(e=>e.id===editId);if(exp){document.getElementById('expLoja').value=exp.loja||'';document.getElementById('expDesc').value=exp.descricao||'';document.getElementById('expTipo').value=exp.tipo||'parcelado';document.getElementById('expValor').value=exp.valor||'';document.getElementById('expParcelas').value=exp.parcelas||1;document.getElementById('expMesInicio').value=exp.mesInicio||currentMonth;document.getElementById('expCartao').value=exp.cartao||'';document.getElementById('expCategoria').value=exp.categoria||'compras';document.getElementById('expDivisao').value=exp.comoDivide||'igual';(exp.quemPaga||[]).forEach(p=>{const cb=document.querySelector(`#expPessoas input[value="${p}"]`);if(cb)cb.checked=true;});}}
+  if(editId){const exp=DATA.cartao.find(e=>e.id===editId);if(exp){document.getElementById('expLoja').value=exp.loja||'';document.getElementById('expDesc').value=exp.descricao||'';document.getElementById('expTipo').value=exp.tipo||'parcelado';document.getElementById('expValor').value=exp.valor||'';document.getElementById('expParcelas').value=exp.parcelas||1;document.getElementById('expMesInicio').value=exp.mesInicio||currentMonth;document.getElementById('expCartao').value=exp.cartao||'';document.getElementById('expCategoria').value=exp.categoria||'compras';document.getElementById('expDivisao').value=exp.comoDivide||'igual';window.__expDivisaoFixaEdit=Object.assign({},exp.divisaoFixa||{});(exp.quemPaga||[]).forEach(p=>{const cb=document.querySelector(`#expPessoas input[value="${p}"]`);if(cb)cb.checked=true;});}}
   else{
-    // Calcular mesInicio com base no dia de corte
-    const hoje=new Date();
-    const diaHoje=hoje.getDate();
-    const diaCorte=DATA.diaCorte||8;
-    let mesRef;
-    if(diaHoje<=diaCorte){
-      // Antes ou no dia de corte: cai no mês atual do calendário
-      mesRef=hoje.toISOString().slice(0,7);
-    } else {
-      // Depois do corte: cai no próximo mês
-      const proximo=new Date(hoje.getFullYear(),hoje.getMonth()+1,1);
-      mesRef=proximo.toISOString().slice(0,7);
-    }
+    // Define o mês inicial conforme o dia de corte:
+    // antes do corte: mês atual | no dia do corte ou depois: próximo mês
+    const mesRef=getDefaultMesInicio();
     document.getElementById('expLoja').value='';
     document.getElementById('expDesc').value='';
     document.getElementById('expTipo').value='parcelado';
@@ -1141,12 +1149,52 @@ function openExpenseModal(editId){
     document.getElementById('expMesInicio').value=mesRef;
     document.getElementById('expCartao').value=currentCartao;
     document.getElementById('expCategoria').value='compras';
-    document.getElementById('expDivisao').value='igual';
+    document.getElementById('expDivisao').value='igual';window.__expDivisaoFixaEdit=null;
   }
   onExpTipoChange();onExpDivisaoChange();openModal('expenseModal');
 }
 function onExpTipoChange(){document.getElementById('expParcelasGroup').style.display=document.getElementById('expTipo').value==='parcelado'?'':'none';updateParcelaPreview('exp');}
-function onExpDivisaoChange(){const c=document.getElementById('expDivisaoFixa');if(document.getElementById('expDivisao').value==='fixo'){c.classList.remove('hidden');const checked=Array.from(document.querySelectorAll('#expPessoas input:checked')).map(i=>i.value);c.innerHTML=checked.map(p=>`<div class="form-group"><label>${capitalize(p)} (R$)</label><input type="number" class="fixo-input" data-person="${p}" step="0.01"></div>`).join('');}else c.classList.add('hidden');}
+function getExpFixoValues(){
+  const vals={};
+  document.querySelectorAll('.fixo-input').forEach(i=>{vals[i.dataset.person]=parseFloat(i.value)||0;});
+  return vals;
+}
+function getExpParcelaValorTotal(v){
+  const tipo=document.getElementById('expTipo').value;
+  const parcelas=tipo==='parcelado'?(parseInt(document.getElementById('expParcelas').value)||1):1;
+  return tipo==='parcelado'?v/parcelas:v;
+}
+function onExpDivisaoChange(){
+  const c=document.getElementById('expDivisaoFixa');
+  if(document.getElementById('expDivisao').value==='fixo'){
+    const oldVals=Object.assign({},window.__expDivisaoFixaEdit||{},getExpFixoValues());
+    c.classList.remove('hidden');
+    const checked=Array.from(document.querySelectorAll('#expPessoas input:checked')).map(i=>i.value);
+    c.innerHTML=checked.map(p=>`<div class="form-group"><label>${capitalize(p)} (R$ total)</label><input type="number" class="fixo-input" data-person="${p}" step="0.01" value="${oldVals[p]||''}" oninput="updateExpDivisaoStatus()"><div style="font-size:10px;color:var(--text-secondary);margin-top:3px;" id="fixoMes_${p}"></div></div>`).join('')+'<div id="expDivisaoStatus" style="font-size:12px;font-weight:600;margin-top:4px;padding:7px 10px;border-radius:var(--radius-xs);"></div>';
+    window.__expDivisaoFixaEdit=null;
+    updateExpDivisaoStatus();
+  }else{
+    c.classList.add('hidden');
+    c.innerHTML='';
+  }
+}
+function updateExpDivisaoStatus(){
+  const status=document.getElementById('expDivisaoStatus');
+  if(!status)return;
+  const total=parseFloat(document.getElementById('expValor').value)||0;
+  const vals=getExpFixoValues();
+  const soma=Object.values(vals).reduce((a,b)=>a+b,0);
+  const diff=+(total-soma).toFixed(2);
+  document.querySelectorAll('.fixo-input').forEach(i=>{
+    const p=i.dataset.person;
+    const mesEl=document.getElementById('fixoMes_'+p);
+    if(mesEl)mesEl.textContent='No mês: '+formatMoney(getExpParcelaValorTotal(parseFloat(i.value)||0));
+  });
+  if(!total){status.textContent='Informe o valor total para conferir a divisão.';status.style.background='rgba(253,203,110,0.18)';status.style.color='#e17055';return;}
+  if(Math.abs(diff)<0.01){status.textContent='Divisão completa: '+formatMoney(soma);status.style.background='rgba(0,184,148,0.10)';status.style.color='var(--success)';}
+  else if(diff>0){status.textContent='Faltando dividir: '+formatMoney(diff);status.style.background='rgba(214,48,49,0.10)';status.style.color='var(--danger)';}
+  else{status.textContent='Valor excedente: '+formatMoney(Math.abs(diff));status.style.background='rgba(214,48,49,0.10)';status.style.color='var(--danger)';}
+}
 function updateParcelaPreview(prefix){
   const parcEl=document.getElementById(prefix+'Parcelas');
   const mesEl=document.getElementById(prefix+'MesInicio');
@@ -1167,7 +1215,16 @@ function saveExpense(){
   const valor=parseFloat(document.getElementById('expValor').value)||0;if(valor<=0)return showToast('Preencha o valor','error');
   const quemPaga=Array.from(document.querySelectorAll('#expPessoas input:checked')).map(i=>i.value);if(!quemPaga.length)return showToast('Selecione quem paga','error');
   const tipo=document.getElementById('expTipo').value;
-  let divisaoFixa={};if(document.getElementById('expDivisao').value==='fixo')document.querySelectorAll('.fixo-input').forEach(i=>{divisaoFixa[i.dataset.person]=parseFloat(i.value)||0;});
+  let divisaoFixa={};
+  if(document.getElementById('expDivisao').value==='fixo'){
+    document.querySelectorAll('.fixo-input').forEach(i=>{divisaoFixa[i.dataset.person]=parseFloat(i.value)||0;});
+    const somaFixa=Object.values(divisaoFixa).reduce((a,b)=>a+b,0);
+    const diferenca=+(valor-somaFixa).toFixed(2);
+    if(Math.abs(diferenca)>=0.01){
+      updateExpDivisaoStatus();
+      return showToast(diferenca>0?`Faltando dividir ${formatMoney(diferenca)}`:`Valor excedente ${formatMoney(Math.abs(diferenca))}`,'error');
+    }
+  }
   const expense={id:document.getElementById('expEditId').value||uid(),loja,descricao:document.getElementById('expDesc').value.trim(),tipo,valor,parcelas:tipo==='parcelado'?(parseInt(document.getElementById('expParcelas').value)||1):1,mesInicio:document.getElementById('expMesInicio').value||currentMonth,quemPaga,comoDivide:document.getElementById('expDivisao').value,divisaoFixa,cartao:document.getElementById('expCartao').value,categoria:document.getElementById('expCategoria').value};
   const editId=document.getElementById('expEditId').value;
   if(editId){const idx=DATA.cartao.findIndex(e=>e.id===editId);if(idx>=0)DATA.cartao[idx]=expense;}else DATA.cartao.push(expense);
