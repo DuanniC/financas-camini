@@ -503,8 +503,26 @@ tbody tr:last-child td { border-bottom:none; }
           </div>
         </div>
       </div>
+      <div class="expandable" id="metaRetiradaSection">
+        <div class="expandable-header" onclick="toggleExpandable(this)">Retirar da Meta <span class="exp-arrow">▼</span></div>
+        <div class="expandable-body">
+          <input type="hidden" id="metaRetiradaEditId" value="">
+          <div class="form-row form-row-2">
+            <div class="form-group"><label>Meta</label><select id="metaRetiradaSelect"></select></div>
+            <div class="form-group"><label>Valor a Retirar (R$)</label><input type="number" id="metaRetiradaValor" placeholder="500"></div>
+          </div>
+          <div class="form-row form-row-2">
+            <div class="form-group"><label>Data</label><input type="date" id="metaRetiradaData"></div>
+            <div class="form-group"><label>Motivo da Retirada</label><input type="text" id="metaRetiradaMotivo" placeholder="Ex: emergência, snow, viagem..."></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-danger" id="metaRetiradaBtn" onclick="addRetirada()">Retirar da Meta</button>
+            <button class="btn btn-outline hidden" id="metaCancelRetiradaEditBtn" onclick="cancelRetiradaEdit()">Cancelar edição</button>
+          </div>
+        </div>
+      </div>
       <div class="expandable" id="metaHistSection">
-        <div class="expandable-header" onclick="toggleExpandable(this)">Histórico de Aportes <span class="exp-arrow">▼</span></div>
+        <div class="expandable-header" onclick="toggleExpandable(this)">Histórico de Aportes e Retiradas <span class="exp-arrow">▼</span></div>
         <div class="expandable-body" id="metaHistBody"></div>
       </div>
     </div>
@@ -1333,6 +1351,7 @@ function ensureMetasMigrated(){
 }
 function getMetas(){ensureMetasMigrated();return (DATA.customData||[]).filter(d=>d.key==='metaItem');}
 function getAportes(){ensureMetasMigrated();return (DATA.customData||[]).filter(d=>d.key==='aporte');}
+function getRetiradas(){return (DATA.customData||[]).filter(d=>d.key==='retirada');}
 function getSelectedMetaId(){const row=(DATA.customData||[]).find(d=>d.key==='metaSelecionada');return row?row.value:'';}
 function setSelectedMetaId(id){
   if(!DATA.customData)DATA.customData=[];
@@ -1375,11 +1394,15 @@ function renderDuanniMeta(){
   if(!DATA.customData)DATA.customData=[];
   const metas=getMetas();
   const aportes=getAportes();
+  const retiradas=getRetiradas();
   const selected=getSelectedMeta();
   const selectedId=selected?selected.id:'';
 
   const dataInput=document.getElementById('metaAporteData');
   if(dataInput&&!dataInput.value)dataInput.value=new Date().toISOString().slice(0,10);
+
+  const dataRetiradaInput=document.getElementById('metaRetiradaData');
+  if(dataRetiradaInput&&!dataRetiradaInput.value)dataRetiradaInput.value=new Date().toISOString().slice(0,10);
 
   const summary=document.getElementById('metaSummary');
   if(summary){
@@ -1387,7 +1410,9 @@ function renderDuanniMeta(){
       summary.innerHTML='';
       summary.classList.add('hidden');
     }else{
-      const total=aportes.filter(a=>a.metaId===selected.id).reduce((s,a)=>s+(a.valor||0),0);
+      const totalAportes=aportes.filter(a=>a.metaId===selected.id).reduce((s,a)=>s+(a.valor||0),0);
+      const totalRetiradas=retiradas.filter(r=>r.metaId===selected.id).reduce((s,r)=>s+(r.valor||0),0);
+      const total=totalAportes-totalRetiradas;
       const alvo=selected.alvo||0;
       const pct=alvo>0?Math.min(100,total/alvo*100):0;
       const falta=alvo>total?alvo-total:0;
@@ -1405,13 +1430,20 @@ function renderDuanniMeta(){
     select.innerHTML=metas.length?metas.map(m=>`<option value="${m.id}" ${m.id===selectedId?'selected':''}>${getMetaEmoji(m)} ${m.nome||'Meta'} · ${formatMoney(m.alvo||0)}</option>`).join(''):'<option value="">Cadastre uma meta primeiro</option>';
   }
 
+  const selectRet=document.getElementById('metaRetiradaSelect');
+  if(selectRet){
+    selectRet.innerHTML=metas.length?metas.map(m=>`<option value="${m.id}" ${m.id===selectedId?'selected':''}>${getMetaEmoji(m)} ${m.nome||'Meta'}</option>`).join(''):'<option value="">Cadastre uma meta primeiro</option>';
+  }
+
   const list=document.getElementById('metaList');
   if(list){
     if(!metas.length){
       list.innerHTML='<p class="meta-empty-hint">Nenhuma meta cadastrada ainda. Adicione sua primeira meta abaixo.</p>';
     }else{
       list.innerHTML=metas.map(m=>{
-        const total=aportes.filter(a=>a.metaId===m.id).reduce((s,a)=>s+(a.valor||0),0);
+        const totalAp=aportes.filter(a=>a.metaId===m.id).reduce((s,a)=>s+(a.valor||0),0);
+        const totalRet=retiradas.filter(r=>r.metaId===m.id).reduce((s,r)=>s+(r.valor||0),0);
+        const total=totalAp-totalRet;
         const alvo=m.alvo||0;
         const pct=alvo>0?Math.min(100,total/alvo*100):0;
         const falta=alvo>total?alvo-total:0;
@@ -1440,9 +1472,16 @@ function renderDuanniMeta(){
     if(!selected){
       hist.innerHTML='<p class="meta-empty-hint">Selecione uma meta para ver e editar os aportes dela.</p>';
     }else{
-      const histAportes=aportes.filter(a=>a.metaId===selected.id).sort((a,b)=>(b.data||'').localeCompare(a.data||''));
-      hist.innerHTML=!histAportes.length?'<p class="meta-empty-hint">Nenhum aporte nesta meta.</p>':
-        histAportes.map(a=>`<div class="expense-item"><div class="meta-emoji">${getMetaEmoji(selected)}</div><div class="ei-info"><div class="ei-name">${formatMoney(a.valor)}</div><div class="ei-detail">${a.data||''} · ${selected.nome||'Meta'}</div></div><div class="meta-actions"><button class="btn-icon" onclick="editAporte('${a.id}')" title="Editar">✎</button><button class="btn-icon" onclick="deleteAporte('${a.id}')" style="color:var(--danger)" title="Excluir">✕</button></div></div>`).join('');
+      const histAportes=aportes.filter(a=>a.metaId===selected.id).map(a=>({...a,tipo:'aporte'}));
+      const histRetiradas=retiradas.filter(r=>r.metaId===selected.id).map(r=>({...r,tipo:'retirada'}));
+      const todos=[...histAportes,...histRetiradas].sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+      hist.innerHTML=!todos.length?'<p class="meta-empty-hint">Nenhum aporte ou retirada nesta meta.</p>':
+        todos.map(a=>{
+          if(a.tipo==='retirada'){
+            return `<div class="expense-item"><div class="meta-emoji" style="background:rgba(214,48,49,0.12);">📤</div><div class="ei-info"><div class="ei-name" style="color:var(--danger)">−${formatMoney(a.valor)}</div><div class="ei-detail">${a.data||''} · <strong>Retirada</strong>${a.motivo?' · '+a.motivo:''}</div></div><div class="meta-actions"><button class="btn-icon" onclick="editRetirada('${a.id}')" title="Editar">✎</button><button class="btn-icon" onclick="deleteRetirada('${a.id}')" style="color:var(--danger)" title="Excluir">✕</button></div></div>`;
+          }
+          return `<div class="expense-item"><div class="meta-emoji">${getMetaEmoji(selected)}</div><div class="ei-info"><div class="ei-name" style="color:var(--success)">+${formatMoney(a.valor)}</div><div class="ei-detail">${a.data||''} · Aporte · ${selected.nome||'Meta'}</div></div><div class="meta-actions"><button class="btn-icon" onclick="editAporte('${a.id}')" title="Editar">✎</button><button class="btn-icon" onclick="deleteAporte('${a.id}')" style="color:var(--danger)" title="Excluir">✕</button></div></div>`;
+        }).join('');
     }
   }
 }
@@ -1527,10 +1566,59 @@ function cancelAporteEdit(doRender=true){
   if(doRender)renderDuanniMeta();
 }
 function deleteAporte(id){if(!confirm('Excluir este aporte?'))return;DATA.customData=(DATA.customData||[]).filter(d=>d.id!==id);DATA.pessoal=(DATA.pessoal||[]).filter(e=>e._metaRef!==id);scheduleSave();renderAll();}
+function addRetirada(){
+  const metas=getMetas();
+  if(!metas.length)return showToast('Cadastre uma meta primeiro','error');
+  const editId=document.getElementById('metaRetiradaEditId')?.value||'';
+  const metaId=document.getElementById('metaRetiradaSelect').value||getSelectedMetaId()||metas[0].id;
+  const meta=metas.find(m=>m.id===metaId)||metas[0];
+  const valor=parseFloat(document.getElementById('metaRetiradaValor').value)||0;
+  if(valor<=0)return showToast('Informe o valor a retirar','error');
+  const data=document.getElementById('metaRetiradaData').value||new Date().toISOString().slice(0,10);
+  const motivo=(document.getElementById('metaRetiradaMotivo').value||'').trim();
+  if(!DATA.customData)DATA.customData=[];
+  if(editId){
+    const ret=DATA.customData.find(d=>d.key==='retirada'&&d.id===editId);
+    if(ret){ret.metaId=meta.id;ret.valor=valor;ret.data=data;ret.motivo=motivo;}
+    setSelectedMetaId(meta.id);
+    cancelRetiradaEdit(false);
+    scheduleSave();renderAll();showToast('Retirada atualizada');
+    return;
+  }
+  const rid=uid();
+  DATA.customData.push({key:'retirada',id:rid,metaId:meta.id,valor,data,motivo});
+  setSelectedMetaId(meta.id);
+  document.getElementById('metaRetiradaValor').value='';
+  document.getElementById('metaRetiradaMotivo').value='';
+  scheduleSave();renderAll();showToast('Retirada registrada');
+}
+function editRetirada(id){
+  const ret=getRetiradas().find(r=>r.id===id); if(!ret)return;
+  setSelectedMetaId(ret.metaId);
+  document.getElementById('metaRetiradaEditId').value=id;
+  document.getElementById('metaRetiradaSelect').value=ret.metaId;
+  document.getElementById('metaRetiradaValor').value=ret.valor||'';
+  document.getElementById('metaRetiradaData').value=ret.data||new Date().toISOString().slice(0,10);
+  document.getElementById('metaRetiradaMotivo').value=ret.motivo||'';
+  document.getElementById('metaRetiradaBtn').textContent='Salvar Retirada';
+  document.getElementById('metaCancelRetiradaEditBtn').classList.remove('hidden');
+  const section=document.getElementById('metaRetiradaSection');
+  if(section&&!section.classList.contains('open'))section.classList.add('open');
+}
+function cancelRetiradaEdit(doRender=true){
+  const edit=document.getElementById('metaRetiradaEditId'); if(edit)edit.value='';
+  const valor=document.getElementById('metaRetiradaValor'); if(valor)valor.value='';
+  const data=document.getElementById('metaRetiradaData'); if(data)data.value=new Date().toISOString().slice(0,10);
+  const motivo=document.getElementById('metaRetiradaMotivo'); if(motivo)motivo.value='';
+  const btn=document.getElementById('metaRetiradaBtn'); if(btn)btn.textContent='Retirar da Meta';
+  const cancel=document.getElementById('metaCancelRetiradaEditBtn'); if(cancel)cancel.classList.add('hidden');
+  if(doRender)renderDuanniMeta();
+}
+function deleteRetirada(id){if(!confirm('Excluir esta retirada?'))return;DATA.customData=(DATA.customData||[]).filter(d=>d.id!==id);scheduleSave();renderAll();}
 function deleteMeta(id){
   if(!confirm('Excluir esta meta e todos os aportes dela?'))return;
   const aporteIds=(DATA.customData||[]).filter(d=>d.key==='aporte'&&d.metaId===id).map(d=>d.id);
-  DATA.customData=(DATA.customData||[]).filter(d=>!(d.key==='metaItem'&&d.id===id)&&!(d.key==='aporte'&&d.metaId===id));
+  DATA.customData=(DATA.customData||[]).filter(d=>!(d.key==='metaItem'&&d.id===id)&&!(d.key==='aporte'&&d.metaId===id)&&!(d.key==='retirada'&&d.metaId===id));
   DATA.pessoal=(DATA.pessoal||[]).filter(e=>!aporteIds.includes(e._metaRef));
   if(getSelectedMetaId()===id){const row=(DATA.customData||[]).find(d=>d.key==='metaSelecionada');if(row)row.value='';}
   resetMetaForms(true);scheduleSave();renderAll();showToast('Meta excluída');
