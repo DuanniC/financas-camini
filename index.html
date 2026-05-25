@@ -2076,13 +2076,17 @@ function saveAddCard(){
   const person=document.getElementById('addCardPerson').value;
   if(!DATA.manualCards)DATA.manualCards={};
   if(!DATA.manualCards[person])DATA.manualCards[person]=[];
-  const item={id:document.getElementById('addCardEditId').value||uid(),descricao:desc,valor,op:document.getElementById('addCardOp').value,mes:currentMonth};
+  const item={id:document.getElementById('addCardEditId').value||uid(),descricao:desc,valor,op:document.getElementById('addCardOp').value};
   const eid=document.getElementById('addCardEditId').value;
   if(eid){const idx=DATA.manualCards[person].findIndex(i=>i.id===eid);if(idx>=0)DATA.manualCards[person][idx]=item;}else DATA.manualCards[person].push(item);
   scheduleSave();closeModal('addCardModal');renderAll();showToast('Card adicionado');
 }
 function deleteManualCard(person,id){if(!confirm('Excluir?'))return;if(DATA.manualCards&&DATA.manualCards[person])DATA.manualCards[person]=(DATA.manualCards[person]||[]).filter(i=>i.id!==id);scheduleSave();renderAll();}
-function getManualCardsForMonth(person,month){return((DATA.manualCards||{})[person]||[]).filter(i=>i.mes===month);}
+function getManualCardsForMonth(person,month){
+  // Cards manuais da seção Pessoal são persistentes e não dependem do mês.
+  // O parâmetro month foi mantido apenas para compatibilidade com as chamadas existentes.
+  return ((DATA.manualCards||{})[person]||[]);
+}
 function getManualCardsTotal(person,month){return getManualCardsForMonth(person,month).reduce((s,i)=>s+(i.op==='subtrai'?-(i.valor||0):(i.valor||0)),0);}
 function renderManualCardsContainer(containerId,person){
   const c=document.getElementById(containerId);if(!c)return;
