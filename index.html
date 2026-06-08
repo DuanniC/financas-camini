@@ -848,7 +848,7 @@ const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 function supaFetch(path,opts={}){return fetch(`${SUPA_URL}/rest/v1/${path}`,{...opts,headers:{'apikey':SUPA_KEY,'Authorization':`Bearer ${SUPA_KEY}`,'Content-Type':'application/json','Prefer':opts.method==='PATCH'||opts.method==='POST'?'return=representation':undefined,...opts.headers}});}
 
 // ===== STATE =====
-let DATA={cartao:[],pessoal:[],apto:{},bancos:['Itaú','PagBank','Nubank','Bradesco'],cartoesBanco:['Itaú','PagBank'],pessoas:['duanni','alan','ronaldo','sueli'],divisao:{duanni:50,alan:50},diaCorte:8,cartaoStatus:[],devoIds:[],devoConfig:{titulo:'💕 cartão do meu amor',legenda:'despesas minhas no cartão dele · subtraído do total'},customData:[],receitaMensal:0,simulacoes:[],caixa:{},aluguel:{},aluguelDescontos:[],amorItems:[],manualCards:{},categorias:[{id:'compras',nome:'Compras',icone:'🛒'},{id:'alimentacao',nome:'Alimentação',icone:'🍔'},{id:'assinaturas',nome:'Assinaturas',icone:'📝'},{id:'streamings',nome:'Streamings',icone:'📺'},{id:'saude',nome:'Saúde/Beleza',icone:'💊'},{id:'lazer',nome:'Lazer',icone:'🎮'},{id:'presentes',nome:'Presentes',icone:'🎁'},{id:'snow',nome:'Snow 🐶',icone:'🐶'},{id:'poupanca',nome:'Poupança',icone:'🏦'},{id:'outros',nome:'Outros',icone:'📦'}]};
+let DATA={cartao:[],pessoal:[],apto:{},bancos:['Itaú','PagBank','Nubank','Bradesco'],cartoesBanco:['Itaú','PagBank'],pessoas:['duanni','alan','ronaldo','sueli'],divisao:{duanni:50,alan:50},diaCorte:8,cartaoStatus:[],devoIds:[],devoConfig:{titulo:'💕 cartão do meu amor',legenda:'despesas minhas no cartão dele · subtraído do total'},customData:[],receitaMensal:0,receitaPorMes:{},simulacoes:[],caixa:{},aluguel:{},aluguelDescontos:[],amorItems:[],manualCards:{},categorias:[{id:'compras',nome:'Compras',icone:'🛒'},{id:'alimentacao',nome:'Alimentação',icone:'🍔'},{id:'assinaturas',nome:'Assinaturas',icone:'📝'},{id:'streamings',nome:'Streamings',icone:'📺'},{id:'saude',nome:'Saúde/Beleza',icone:'💊'},{id:'lazer',nome:'Lazer',icone:'🎮'},{id:'presentes',nome:'Presentes',icone:'🎁'},{id:'snow',nome:'Snow 🐶',icone:'🐶'},{id:'poupanca',nome:'Poupança',icone:'🏦'},{id:'outros',nome:'Outros',icone:'📦'}]};
 let currentMonth=new Date().toISOString().slice(0,7);
 let currentPage='page-cartao';
 let currentCartao='';
@@ -1005,6 +1005,7 @@ function renderAll(){renderCards();renderPersonFilter();renderCartaoTable();rend
 function capitalize(s){return s?s.charAt(0).toUpperCase()+s.slice(1):'';}
 function formatMoney(v){return'R$ '+(v||0).toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+function getReceitaDoMes(month){if(!DATA.receitaPorMes)DATA.receitaPorMes={};if(DATA.receitaPorMes[month]!==undefined)return DATA.receitaPorMes[month];return DATA.receitaMensal||0;}
 function showToast(msg,type='success'){const t=document.getElementById('toast');t.textContent=msg;t.className='toast toast-'+type+' show';setTimeout(()=>t.classList.remove('show'),2500);}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 function openModal(id){document.getElementById(id).classList.add('open');}
@@ -1626,8 +1627,8 @@ function deleteMeta(id){
 
 // ===== RENDER: PLANEJAMENTO =====
 function renderDuanniPlanejamento(){
-  document.getElementById('receitaMensal').value=DATA.receitaMensal||'';
-  const receita=DATA.receitaMensal||0;
+  const receita=getReceitaDoMes(currentMonth);
+  document.getElementById('receitaMensal').value=receita||'';
   const cartao=getPersonCartaoTotal('duanni',currentMonth);const apto=getPersonAptoShare('duanni',currentMonth);
   const pessoal=getPersonalExpensesForMonth('duanni',currentMonth).filter(e=>!e._metaRef).reduce((s,e)=>s+getMonthValue(e),0);
   const desp=cartao+apto+pessoal;const saldo=receita-desp;
@@ -1636,7 +1637,7 @@ function renderDuanniPlanejamento(){
     <div class="bubble bubble-pink"><div class="bubble-label">Despesas</div><div class="bubble-value">${formatMoney(desp)}</div></div>
     <div class="bubble ${saldo>=0?'bubble-green':'bubble-orange'}"><div class="bubble-label">${saldo>=0?'Saldo Livre':'Faltando'}</div><div class="bubble-value">${formatMoney(Math.abs(saldo))}</div></div>`;
 }
-function saveReceitaMensal(){DATA.receitaMensal=parseFloat(document.getElementById('receitaMensal').value)||0;scheduleSave();renderDuanniPlanejamento();showToast('Receita salva');}
+function saveReceitaMensal(){if(!DATA.receitaPorMes)DATA.receitaPorMes={};DATA.receitaPorMes[currentMonth]=parseFloat(document.getElementById('receitaMensal').value)||0;scheduleSave();renderDuanniPlanejamento();showToast('Receita salva para '+currentMonth);}
 
 // ===== RENDER: SIMULAR =====
 function renderDuanniSimular(){
@@ -1653,7 +1654,7 @@ function runSimulation(){
   if(parcelas<=0||meses<=0)return showToast('Preencha parcelas e meses','error');
 
   const pm=valor/parcelas;
-  const receita=DATA.receitaMensal||0;
+  const receita=getReceitaDoMes(currentMonth);
   const rows=[];
   const[sy,sm]=currentMonth.split('-').map(Number);
   const totalMeses=meses; // respeita exatamente o período que você pediu para visualizar
@@ -1748,7 +1749,7 @@ function renderDuanniControle(){
   let cum=0;const paths=sorted.map(([,val],i)=>{const p=grandT>0?val/grandT:0;const a=p*360;const s=cum;cum+=a;return createArc(80,80,60,s,cum,colors[i]);});
   const legend=sorted.map(([cat,val],i)=>`<div class="donut-legend-item"><div class="dot" style="background:${colors[i]}"></div>${capitalize(cat)} ${formatMoney(val)}</div>`).join('');
   donut.innerHTML=`<svg class="donut-svg" viewBox="0 0 160 160">${paths.join('')}<circle cx="80" cy="80" r="38" fill="var(--card-bg)"/><text x="80" y="78" text-anchor="middle" font-family="var(--font-display)" font-size="12" font-weight="800" fill="var(--text)">${formatMoney(grandT)}</text><text x="80" y="92" text-anchor="middle" font-size="9" fill="var(--text-secondary)">Total</text></svg><div class="donut-legend">${legend}</div>`;
-  const receita=DATA.receitaMensal||0;const pctR=receita>0?(grandT/receita*100).toFixed(1):'—';
+  const receita=getReceitaDoMes(currentMonth);const pctR=receita>0?(grandT/receita*100).toFixed(1):'—';
   document.getElementById('controlSuggestions').innerHTML=`<p>📊 ${pctR}% da receita gasta.</p><p>📌 Maior: ${sorted.length?capitalize(sorted[0][0]):'—'}</p><p>📺 Assinaturas: ${formatMoney((cats['assinaturas']||0)+(cats['streamings']||0))}</p>`;
 }
 function createArc(cx,cy,r,sa,ea,color){if(ea-sa>=359.9)return`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="22"/>`;const s=pol(cx,cy,r,ea),e=pol(cx,cy,r,sa);return`<path d="M ${s.x} ${s.y} A ${r} ${r} 0 ${ea-sa>180?1:0} 0 ${e.x} ${e.y}" fill="none" stroke="${color}" stroke-width="22"/>`;}
