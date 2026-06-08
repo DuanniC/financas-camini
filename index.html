@@ -449,7 +449,6 @@ tbody tr:last-child td { border-bottom:none; }
     <div class="sub-tab-bar">
       <div class="sub-tab active" data-subtab="duanni-inicio" onclick="switchSubTab('duanni','duanni-inicio')">Início</div>
       <div class="sub-tab" data-subtab="duanni-meta" onclick="switchSubTab('duanni','duanni-meta')">Meta</div>
-      <div class="sub-tab" data-subtab="duanni-planejamento" onclick="switchSubTab('duanni','duanni-planejamento')">Planejamento</div>
       <div class="sub-tab" data-subtab="duanni-simular" onclick="switchSubTab('duanni','duanni-simular')">Simular</div>
       <div class="sub-tab" data-subtab="duanni-controle" onclick="switchSubTab('duanni','duanni-controle')">Controle</div>
     </div>
@@ -524,13 +523,6 @@ tbody tr:last-child td { border-bottom:none; }
       <div class="expandable" id="metaHistSection">
         <div class="expandable-header" onclick="toggleExpandable(this)">Histórico de Aportes e Retiradas <span class="exp-arrow">▼</span></div>
         <div class="expandable-body" id="metaHistBody"></div>
-      </div>
-    </div>
-    <div class="sub-page" id="duanni-planejamento">
-      <div class="summary-bubbles" id="planSummary"></div>
-      <div class="card">
-        <div class="form-group"><label>Receita Mensal (R$)</label><input type="number" id="receitaMensal" placeholder="5000"></div>
-        <button class="btn btn-primary" onclick="saveReceitaMensal()">Salvar</button>
       </div>
     </div>
     <div class="sub-page" id="duanni-simular">
@@ -686,6 +678,25 @@ tbody tr:last-child td { border-bottom:none; }
           <div class="form-group" style="margin-bottom:0;"><input type="text" id="newCategoriaIcone" placeholder="🛒" maxlength="2" style="text-align:center;"></div>
           <div class="form-group" style="margin-bottom:0;"><input type="text" id="newCategoriaNome" placeholder="Nome da categoria"></div>
           <div><button class="btn btn-secondary" onclick="addCategoria()">Adicionar</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px;">
+      <div class="card-title">Receita Mensal</div>
+      <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border);">
+        <p style="font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Padrão (todos os meses)</p>
+        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">Usado quando o mês não tem um valor específico definido.</p>
+        <div style="display:flex;align-items:flex-end;gap:8px;">
+          <div class="form-group" style="margin-bottom:0;"><label>Valor (R$)</label><input type="number" id="receitaPadrao" placeholder="1000" style="width:140px;"></div>
+          <button class="btn btn-outline" onclick="saveReceitaPadrao()">Salvar padrão</button>
+        </div>
+      </div>
+      <div>
+        <p style="font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Específico para <strong id="receitaMesLabel" style="color:var(--accent);text-transform:none;"></strong></p>
+        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">Sobrescreve o padrão apenas neste mês.</p>
+        <div style="display:flex;align-items:flex-end;gap:8px;">
+          <div class="form-group" style="margin-bottom:0;"><label>Valor (R$)</label><input type="number" id="receitaMensal" placeholder="Deixe vazio para usar o padrão" style="width:200px;"></div>
+          <button class="btn btn-primary" onclick="saveReceitaMensal()">Salvar mês</button>
         </div>
       </div>
     </div>
@@ -1005,7 +1016,7 @@ function renderAll(){renderCards();renderPersonFilter();renderCartaoTable();rend
 function capitalize(s){return s?s.charAt(0).toUpperCase()+s.slice(1):'';}
 function formatMoney(v){return'R$ '+(v||0).toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
-function getReceitaDoMes(month){if(!DATA.receitaPorMes)DATA.receitaPorMes={};if(DATA.receitaPorMes[month]!==undefined)return DATA.receitaPorMes[month];return DATA.receitaMensal||0;}
+function getReceitaDoMes(month){if(!DATA.receitaPorMes)DATA.receitaPorMes={};if(DATA.receitaPorMes[month]!==undefined)return DATA.receitaPorMes[month];return DATA.receitaMensal||1000;}
 function showToast(msg,type='success'){const t=document.getElementById('toast');t.textContent=msg;t.className='toast toast-'+type+' show';setTimeout(()=>t.classList.remove('show'),2500);}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 function openModal(id){document.getElementById(id).classList.add('open');}
@@ -1317,11 +1328,14 @@ function renderDuanniInicio(){
   const manT=getManualCardsTotal('duanni',currentMonth);
   const grand=cartaoT+aptoT+pTotal+manT;
   const cardDet=DATA.cartoesBanco.map(c=>{const t=getPersonCartaoTotalByCard('duanni',currentMonth,c);return t>0?`${c}: ${formatMoney(t)}`:''}).filter(Boolean).join('<br>');
+  const separadoDet=`Apto: ${formatMoney(aptoT)}<br>Pessoal: ${formatMoney(pTotal)}`;
+  const receita=getReceitaDoMes(currentMonth);
+  const saldoLivre=receita-grand;
   const s=document.getElementById('duanniSummary');if(!s)return;
   s.innerHTML=`<div class="bubble bubble-pink"><div class="bubble-label">Total</div><div class="bubble-value">${formatMoney(grand)}</div></div>
     <div class="bubble bubble-purple"><div class="bubble-label">Cartão</div><div class="bubble-value">${formatMoney(cartaoT)}</div><div class="bubble-sub">${cardDet}</div></div>
-    <div class="bubble bubble-green"><div class="bubble-label">Apto</div><div class="bubble-value">${formatMoney(aptoT)}</div></div>
-    <div class="bubble bubble-orange"><div class="bubble-label">Pessoal</div><div class="bubble-value">${formatMoney(pTotal)}</div></div>`;
+    <div class="bubble bubble-green"><div class="bubble-label">Separado</div><div class="bubble-value">${formatMoney(aptoT+pTotal)}</div><div class="bubble-sub">${separadoDet}</div></div>
+    <div class="bubble ${saldoLivre>=0?'bubble-orange':'bubble-orange'}"><div class="bubble-label">Saldo Livre</div><div class="bubble-value" style="color:${saldoLivre>=0?'var(--success)':'var(--danger)'}">${formatMoney(Math.abs(saldoLivre))}</div><div class="bubble-sub">${saldoLivre<0?'Faltando':''}</div></div>`;
   const list=document.getElementById('duanniPersonalList'),empty=document.getElementById('duanniPersonalEmpty');
   if(!pExps.length){list.innerHTML='';empty.classList.remove('hidden');return;}
   empty.classList.add('hidden');
@@ -1625,19 +1639,12 @@ function deleteMeta(id){
   resetMetaForms(true);scheduleSave();renderAll();showToast('Meta excluída');
 }
 
-// ===== RENDER: PLANEJAMENTO =====
+// ===== RENDER: PLANEJAMENTO (mantido para Simular usar receita) =====
 function renderDuanniPlanejamento(){
-  const receita=getReceitaDoMes(currentMonth);
-  document.getElementById('receitaMensal').value=receita||'';
-  const cartao=getPersonCartaoTotal('duanni',currentMonth);const apto=getPersonAptoShare('duanni',currentMonth);
-  const pessoal=getPersonalExpensesForMonth('duanni',currentMonth).filter(e=>!e._metaRef).reduce((s,e)=>s+getMonthValue(e),0);
-  const desp=cartao+apto+pessoal;const saldo=receita-desp;
-  document.getElementById('planSummary').innerHTML=`
-    <div class="bubble bubble-green"><div class="bubble-label">Receita</div><div class="bubble-value">${formatMoney(receita)}</div></div>
-    <div class="bubble bubble-pink"><div class="bubble-label">Despesas</div><div class="bubble-value">${formatMoney(desp)}</div></div>
-    <div class="bubble ${saldo>=0?'bubble-green':'bubble-orange'}"><div class="bubble-label">${saldo>=0?'Saldo Livre':'Faltando'}</div><div class="bubble-value">${formatMoney(Math.abs(saldo))}</div></div>`;
+  // Seção removida da UI — função mantida para compatibilidade com Simular
 }
-function saveReceitaMensal(){if(!DATA.receitaPorMes)DATA.receitaPorMes={};DATA.receitaPorMes[currentMonth]=parseFloat(document.getElementById('receitaMensal').value)||0;scheduleSave();renderDuanniPlanejamento();showToast('Receita salva para '+currentMonth);}
+function saveReceitaPadrao(){const val=parseFloat(document.getElementById('receitaPadrao').value)||1000;DATA.receitaMensal=val;scheduleSave();renderAll();showToast('Padrão atualizado: '+formatMoney(val));}
+function saveReceitaMensal(){if(!DATA.receitaPorMes)DATA.receitaPorMes={};const raw=document.getElementById('receitaMensal').value;if(!raw||!raw.trim()){delete DATA.receitaPorMes[currentMonth];scheduleSave();renderAll();showToast('Usando padrão em '+currentMonth);}else{DATA.receitaPorMes[currentMonth]=parseFloat(raw)||1000;scheduleSave();renderAll();showToast('Receita salva para '+currentMonth);}}
 
 // ===== RENDER: SIMULAR =====
 function renderDuanniSimular(){
@@ -2111,6 +2118,12 @@ function renderConfig(){
   const ce=document.getElementById('configCartoes');
   if(ce)ce.innerHTML=DATA.cartoesBanco.map((c,i)=>`<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;"><input type="text" value="${c}" onchange="updateCartao(${i},this.value)" style="flex:1;padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius-xs);font-size:12px;"><button class="btn-icon" onclick="deleteCartao(${i})" style="color:var(--danger)">✕</button></div>`).join('');
   const dc=document.getElementById('diaCorte');if(dc)dc.value=DATA.diaCorte||8;
+
+  // Receita mensal por mês
+  const rp=document.getElementById('receitaPadrao');if(rp)rp.value=DATA.receitaMensal||1000;
+  const rm=document.getElementById('receitaMensal');if(rm){const especifico=(DATA.receitaPorMes||{})[currentMonth];rm.value=especifico!==undefined?especifico:'';}
+  const rml=document.getElementById('receitaMesLabel');
+  if(rml){const monthNames=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];const[y,mo]=currentMonth.split('-').map(Number);rml.textContent=monthNames[mo-1]+'/'+y;}
   
   // Render bancos configuration
   const be=document.getElementById('configBancos');
