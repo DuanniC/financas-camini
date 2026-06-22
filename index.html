@@ -570,16 +570,14 @@ tbody tr:last-child td { border-bottom:none; }
       </div>
     </div>
     <div id="alanAmorCustomList" style="margin-bottom:14px;"></div>
-    <div class="card"><div class="card-title">Despesas do Cartão</div><div class="table-wrap"><table><thead><tr><th>Descrição</th><th>Parc</th><th>Valor</th></tr></thead><tbody id="alanCartaoBody"></tbody></table></div></div>
-    <div id="alanAddCardContainer" style="margin-top:20px;"></div>
+    <div class="card"><div class="card-title">Despesas<button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="openAddCardModal('alan')">＋ Adicionar</button></div><div class="table-wrap"><table><thead><tr><th>Descrição</th><th>Parc</th><th>Valor</th><th></th></tr></thead><tbody id="alanCartaoBody"></tbody></table></div></div>
   </div>
 
   <!-- ===== RONALDO ===== -->
   <div class="page" id="page-ronaldo">
     <div class="page-header"><h1 class="page-title">Ronaldo</h1><div class="month-selector"><button onclick="changeMonth(-1)">◀</button><span class="month-label" id="monthLabelRonaldo"></span><button onclick="changeMonth(1)">▶</button></div></div>
     <div class="summary-bubbles summary-bubbles-single" id="ronaldoSummary"></div>
-    <div class="card"><div class="card-title">Despesas do Cartão</div><div class="table-wrap"><table><thead><tr><th>Descrição</th><th>Parc</th><th>Valor</th></tr></thead><tbody id="ronaldoCartaoBody"></tbody></table></div></div>
-    <div id="ronaldoAddCardContainer" style="margin-top:20px;"></div>
+    <div class="card"><div class="card-title">Despesas<button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="openAddCardModal('ronaldo')">＋ Adicionar</button></div><div class="table-wrap"><table><thead><tr><th>Descrição</th><th>Parc</th><th>Valor</th><th></th></tr></thead><tbody id="ronaldoCartaoBody"></tbody></table></div></div>
   </div>
 
   <!-- ===== DYNAMIC PERSON PAGES (Rick + qualquer pessoa adicionada em Configurações) ===== -->
@@ -772,7 +770,7 @@ tbody tr:last-child td { border-bottom:none; }
     </div>
     <div id="peParcelaPreview" style="display:none;font-size:12px;color:var(--success);font-weight:600;margin-bottom:12px;padding:6px 10px;background:rgba(0,184,148,0.08);border-radius:var(--radius-xs);"></div>
     <div class="form-row form-row-2">
-      <div class="form-group"><label>Dia Pagamento</label><input type="number" id="peDia" min="1" max="31" value="10"></div>
+      <div class="form-group"><label>Dia Pagamento</label><input type="number" id="peDia" min="1" max="31"></div>
       <div class="form-group"><label>Categoria</label><select id="peCategoria"></select></div>
     </div>
     <div class="form-group"><label>Banco</label><select id="peBanco"></select></div>
@@ -834,17 +832,21 @@ tbody tr:last-child td { border-bottom:none; }
   </div>
 </div>
 
-<!-- Add Card Modal (for all personal profiles) -->
+<!-- Add Expense Modal (for all personal profiles) -->
 <div class="modal-overlay" id="addCardModal">
   <div class="modal">
-    <div class="modal-header"><h3>➕ Adicionar Card</h3><button class="modal-close" onclick="closeModal('addCardModal')">✕</button></div>
-    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">Adicione um ajuste manual ao total. Use para valores que não estão vinculados às despesas.</p>
+    <div class="modal-header"><h3 id="addCardModalTitle">➕ Adicionar Despesa</h3><button class="modal-close" onclick="closeModal('addCardModal')">✕</button></div>
     <div class="form-group"><label>Descrição</label><input type="text" id="addCardDesc" placeholder="Ex: Reembolso, ajuste..."></div>
     <div class="form-row form-row-2">
       <div class="form-group"><label>Valor (R$)</label><input type="number" id="addCardValor" step="0.01"></div>
-      <div class="form-group"><label>Operação</label><select id="addCardOp"><option value="soma">＋ Somar</option><option value="subtrai">－ Subtrair</option></select></div>
+      <div class="form-group"><label>Operação</label><select id="addCardOp"><option value="subtrai">－ Subtrair</option><option value="soma">＋ Somar</option></select></div>
     </div>
-    <div style="display:flex;gap:6px;justify-content:flex-end;"><button class="btn btn-outline" onclick="closeModal('addCardModal')">Cancelar</button><button class="btn btn-primary" onclick="saveAddCard()">Salvar</button></div>
+    <div class="form-row form-row-2">
+      <div class="form-group"><label>Tipo</label><select id="addCardTipo" onchange="onAddCardTipoChange()"><option value="avista">À vista</option><option value="parcelado">Parcelado</option><option value="recorrente">Recorrente (todos os meses)</option></select></div>
+      <div class="form-group" id="addCardParcelasGroup" style="display:none;"><label>Parcelas</label><input type="number" id="addCardParcelas" min="1" value="1"></div>
+    </div>
+    <div class="form-group" id="addCardMesInicioGroup"><label>Mês início</label><input type="month" id="addCardMesInicio"></div>
+    <div style="display:flex;gap:6px;justify-content:flex-end;"><button class="btn btn-outline" onclick="closeModal('addCardModal')">Cancelar</button><button id="addCardDeleteBtn" class="btn btn-danger" style="display:none;" onclick="deleteAddCard()">Excluir</button><button class="btn btn-primary" onclick="saveAddCard()">Salvar</button></div>
     <input type="hidden" id="addCardPerson">
     <input type="hidden" id="addCardEditId">
   </div>
@@ -1268,8 +1270,9 @@ function openPersonalExpenseModal(person,editId){
   document.getElementById('pePerson').value=person;document.getElementById('peEditId').value=editId||'';
   document.getElementById('peBanco').innerHTML=(DATA.bancos||[]).map(b=>`<option value="${b}">${b}</option>`).join('');
   document.getElementById('peCategoria').innerHTML=(DATA.categorias||[]).map(c=>`<option value="${c.id}">${c.icone} ${c.nome}</option>`).join('');
-  if(editId){const exp=(DATA.pessoal||[]).find(e=>e.id===editId);if(exp){document.getElementById('peDesc').value=exp.descricao||'';document.getElementById('peValor').value=exp.valor||'';document.getElementById('peTipo').value=exp.tipo||'recorrente';document.getElementById('peParcelas').value=exp.parcelas||1;document.getElementById('peMesInicio').value=exp.mesInicio||currentMonth;document.getElementById('peDia').value=exp.dia||10;document.getElementById('peCategoria').value=exp.categoria||'outros';document.getElementById('peBanco').value=exp.banco||'';document.getElementById('peObs').value=exp.obs||'';}}
-  else{document.getElementById('peDesc').value='';document.getElementById('peValor').value='';document.getElementById('peTipo').value='recorrente';document.getElementById('peParcelas').value=1;document.getElementById('peMesInicio').value=currentMonth;document.getElementById('peDia').value=10;document.getElementById('peCategoria').value='outros';document.getElementById('peObs').value='';}
+  const _todayDay=new Date().getDate();
+  if(editId){const exp=(DATA.pessoal||[]).find(e=>e.id===editId);if(exp){document.getElementById('peDesc').value=exp.descricao||'';document.getElementById('peValor').value=exp.valor||'';document.getElementById('peTipo').value=exp.tipo||'recorrente';document.getElementById('peParcelas').value=exp.parcelas||1;document.getElementById('peMesInicio').value=exp.mesInicio||currentMonth;document.getElementById('peDia').value=exp.dia||_todayDay;document.getElementById('peCategoria').value=exp.categoria||'outros';document.getElementById('peBanco').value=exp.banco||'';document.getElementById('peObs').value=exp.obs||'';}}
+  else{document.getElementById('peDesc').value='';document.getElementById('peValor').value='';document.getElementById('peTipo').value='recorrente';document.getElementById('peParcelas').value=1;document.getElementById('peMesInicio').value=currentMonth;document.getElementById('peDia').value=_todayDay;document.getElementById('peCategoria').value='outros';document.getElementById('peObs').value='';}
   onPeTipoChange();
   // Show devo checkbox only for duanni
   const devoGrp=document.getElementById('peDevoGroup');
@@ -1283,7 +1286,7 @@ function savePersonalExpense(){
   const desc=document.getElementById('peDesc').value.trim();if(!desc)return showToast('Preencha','error');
   const valor=parseFloat(document.getElementById('peValor').value)||0;if(valor<=0)return showToast('Valor','error');
   const tipo=document.getElementById('peTipo').value;
-  const exp={id:document.getElementById('peEditId').value||uid(),pessoa:document.getElementById('pePerson').value,descricao:desc,valor,tipo,parcelas:tipo==='parcelado'?(parseInt(document.getElementById('peParcelas').value)||1):1,mesInicio:document.getElementById('peMesInicio').value||currentMonth,dia:parseInt(document.getElementById('peDia').value)||10,categoria:document.getElementById('peCategoria').value,banco:document.getElementById('peBanco').value,obs:document.getElementById('peObs').value.trim()};
+  const exp={id:document.getElementById('peEditId').value||uid(),pessoa:document.getElementById('pePerson').value,descricao:desc,valor,tipo,parcelas:tipo==='parcelado'?(parseInt(document.getElementById('peParcelas').value)||1):1,mesInicio:document.getElementById('peMesInicio').value||currentMonth,dia:parseInt(document.getElementById('peDia').value)||new Date().getDate(),categoria:document.getElementById('peCategoria').value,banco:document.getElementById('peBanco').value,obs:document.getElementById('peObs').value.trim()};
   if(!DATA.pessoal)DATA.pessoal=[];
   const editId=document.getElementById('peEditId').value;
   if(editId){const idx=DATA.pessoal.findIndex(e=>e.id===editId);if(idx>=0)DATA.pessoal[idx]=exp;}else DATA.pessoal.push(exp);
@@ -1323,7 +1326,7 @@ function renderDuanniInicio(){
   renderManualCardsContainer('duanniAddCardContainer','duanni');
   const cartaoT=getPersonCartaoTotal('duanni',currentMonth);
   const aptoT=getPersonAptoShare('duanni',currentMonth);
-  const pExps=getPersonalExpensesForMonth('duanni',currentMonth).filter(e=>!e._metaRef);
+  const pExps=getPersonalExpensesForMonth('duanni',currentMonth).filter(e=>!e._metaRef).sort((a,b)=>(parseInt(a.dia)||0)-(parseInt(b.dia)||0));
   const pTotal=pExps.reduce((s,e)=>s+getMonthValue(e),0);
   const manT=getManualCardsTotal('duanni',currentMonth);
   const grand=cartaoT+aptoT+pTotal+manT;
@@ -1830,19 +1833,17 @@ function renderAlan(){
     }
   }
 
-  renderManualCardsContainer('alanAddCardContainer','alan');
-  document.getElementById('alanCartaoBody').innerHTML=(DATA.cartao||[]).filter(e=>isExpenseInMonth(e,currentMonth)&&e.quemPaga&&e.quemPaga.includes('alan')).map(e=>`<tr><td>${e.descricao||e.loja||''}</td><td>${getParcelaLabel(e,currentMonth)}</td><td><strong>${formatMoney(getPersonShare(e,'alan'))}</strong></td></tr>`).join('');
+  renderPersonDespesasTable('alan','alanCartaoBody');
 }
 
 // ===== RENDER: RONALDO =====
 function renderRonaldo(){
-  renderManualCardsContainer('ronaldoAddCardContainer','ronaldo');
   const ct=getPersonCartaoTotal('ronaldo',currentMonth);
   const manT=getManualCardsTotal('ronaldo',currentMonth);
   const total=ct+manT;
   const cd=DATA.cartoesBanco.map(c=>{const t=getPersonCartaoTotalByCard('ronaldo',currentMonth,c);return t>0?`${c}: ${formatMoney(t)}`:''}).filter(Boolean).join('<br>');
   document.getElementById('ronaldoSummary').innerHTML=`<div class="bubble bubble-green" style="text-align:center;padding:20px;"><div class="bubble-label">Total do Mês</div><div class="bubble-value" style="font-size:28px;">${formatMoney(total)}</div><div class="bubble-sub">${cd}</div></div>`;
-  document.getElementById('ronaldoCartaoBody').innerHTML=(DATA.cartao||[]).filter(e=>isExpenseInMonth(e,currentMonth)&&e.quemPaga&&e.quemPaga.includes('ronaldo')).map(e=>`<tr><td>${e.descricao||e.loja||''}</td><td>${getParcelaLabel(e,currentMonth)}</td><td><strong>${formatMoney(getPersonShare(e,'ronaldo'))}</strong></td></tr>`).join('');
+  renderPersonDespesasTable('ronaldo','ronaldoCartaoBody');
 }
 
 // ===== DYNAMIC PERSON PAGES =====
@@ -1880,8 +1881,7 @@ function ensureDynamicPersonPages(){
     div.innerHTML=`
       <div class="page-header"><h1 class="page-title">${cap}</h1><div class="month-selector"><button onclick="changeMonth(-1)">◀</button><span class="month-label"></span><button onclick="changeMonth(1)">▶</button></div></div>
       <div class="summary-bubbles summary-bubbles-single" id="${p}Summary"></div>
-      <div class="card"><div class="card-title">Despesas do Cartão</div><div class="table-wrap"><table><thead><tr><th>Descrição</th><th>Parc</th><th>Valor</th></tr></thead><tbody id="${p}CartaoBody"></tbody></table></div></div>
-      <div id="${p}AddCardContainer" style="margin-top:20px;"></div>`;
+      <div class="card"><div class="card-title">Despesas<button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="openAddCardModal('${p}')">＋ Adicionar</button></div><div class="table-wrap"><table><thead><tr><th>Descrição</th><th>Parc</th><th>Valor</th><th></th></tr></thead><tbody id="${p}CartaoBody"></tbody></table></div></div>`;
     container.appendChild(div);
   });
 }
@@ -1889,7 +1889,6 @@ function renderDynamicPersonPage(person){
   const sumEl=document.getElementById(`${person}Summary`);
   const bodyEl=document.getElementById(`${person}CartaoBody`);
   if(!sumEl||!bodyEl)return;
-  renderManualCardsContainer(`${person}AddCardContainer`,person);
   const ct=getPersonCartaoTotal(person,currentMonth);
   const manT=getManualCardsTotal(person,currentMonth);
   const total=ct+manT;
@@ -1900,7 +1899,7 @@ function renderDynamicPersonPage(person){
   const dynList=getDynamicPeople();
   const colorCls=colorMap[person]||dynColors[dynList.indexOf(person)%dynColors.length];
   sumEl.innerHTML=`<div class="bubble ${colorCls}" style="text-align:center;padding:20px;"><div class="bubble-label">Total do Mês</div><div class="bubble-value" style="font-size:28px;">${formatMoney(total)}</div><div class="bubble-sub">${cd}</div></div>`;
-  bodyEl.innerHTML=(DATA.cartao||[]).filter(e=>isExpenseInMonth(e,currentMonth)&&e.quemPaga&&e.quemPaga.includes(person)).map(e=>`<tr><td>${e.descricao||e.loja||''}</td><td>${getParcelaLabel(e,currentMonth)}</td><td><strong>${formatMoney(getPersonShare(e,person))}</strong></td></tr>`).join('');
+  renderPersonDespesasTable(person,`${person}CartaoBody`);
 }
 function renderAllDynamicPersonPages(){
   ensureDynamicPersonPages();
@@ -2066,46 +2065,110 @@ function editAmorCartaoName(){
 
 // ===== ADD CARD (manual adjustment) =====
 let addCardCurrentPerson='';
+function onAddCardTipoChange(){
+  const t=document.getElementById('addCardTipo').value;
+  document.getElementById('addCardParcelasGroup').style.display=(t==='parcelado')?'block':'none';
+  document.getElementById('addCardMesInicioGroup').style.display=(t==='recorrente')?'none':'block';
+}
 function openAddCardModal(person,editId){
   addCardCurrentPerson=person;
   document.getElementById('addCardPerson').value=person;
   document.getElementById('addCardEditId').value=editId||'';
+  document.getElementById('addCardModalTitle').textContent=editId?'✎ Editar Despesa':'➕ Adicionar Despesa';
+  document.getElementById('addCardDeleteBtn').style.display=editId?'inline-block':'none';
   if(editId){
     const item=((DATA.manualCards||{})[person]||[]).find(i=>i.id===editId);
-    if(item){document.getElementById('addCardDesc').value=item.descricao||'';document.getElementById('addCardValor').value=item.valor||'';document.getElementById('addCardOp').value=item.op||'soma';}
+    if(item){
+      document.getElementById('addCardDesc').value=item.descricao||'';
+      document.getElementById('addCardValor').value=item.valor||'';
+      document.getElementById('addCardOp').value=item.op||'subtrai';
+      document.getElementById('addCardTipo').value=item.tipo||'recorrente';
+      document.getElementById('addCardParcelas').value=item.parcelas||1;
+      document.getElementById('addCardMesInicio').value=item.mesInicio||currentMonth;
+    }
   } else {
-    document.getElementById('addCardDesc').value='';document.getElementById('addCardValor').value='';document.getElementById('addCardOp').value='soma';
+    document.getElementById('addCardDesc').value='';
+    document.getElementById('addCardValor').value='';
+    document.getElementById('addCardOp').value='subtrai';
+    document.getElementById('addCardTipo').value='avista';
+    document.getElementById('addCardParcelas').value=1;
+    document.getElementById('addCardMesInicio').value=currentMonth;
   }
+  onAddCardTipoChange();
   openModal('addCardModal');
 }
 function saveAddCard(){
   const desc=document.getElementById('addCardDesc').value.trim();if(!desc)return showToast('Preencha','error');
   const valor=parseFloat(document.getElementById('addCardValor').value)||0;if(valor<=0)return showToast('Valor','error');
   const person=document.getElementById('addCardPerson').value;
+  const tipo=document.getElementById('addCardTipo').value;
+  const parcelas=tipo==='parcelado'?(parseInt(document.getElementById('addCardParcelas').value)||1):1;
+  const mesInicio=document.getElementById('addCardMesInicio').value||currentMonth;
   if(!DATA.manualCards)DATA.manualCards={};
   if(!DATA.manualCards[person])DATA.manualCards[person]=[];
-  const item={id:document.getElementById('addCardEditId').value||uid(),descricao:desc,valor,op:document.getElementById('addCardOp').value};
+  const item={id:document.getElementById('addCardEditId').value||uid(),descricao:desc,valor,op:document.getElementById('addCardOp').value,tipo,parcelas,mesInicio};
   const eid=document.getElementById('addCardEditId').value;
   if(eid){const idx=DATA.manualCards[person].findIndex(i=>i.id===eid);if(idx>=0)DATA.manualCards[person][idx]=item;}else DATA.manualCards[person].push(item);
-  scheduleSave();closeModal('addCardModal');renderAll();showToast('Card adicionado');
+  scheduleSave();closeModal('addCardModal');renderAll();showToast(eid?'Atualizada':'Adicionada');
 }
 function deleteManualCard(person,id){if(!confirm('Excluir?'))return;if(DATA.manualCards&&DATA.manualCards[person])DATA.manualCards[person]=(DATA.manualCards[person]||[]).filter(i=>i.id!==id);scheduleSave();renderAll();}
-function getManualCardsForMonth(person,month){
-  // Cards manuais da seção Pessoal são persistentes e não dependem do mês.
-  // O parâmetro month foi mantido apenas para compatibilidade com as chamadas existentes.
-  return ((DATA.manualCards||{})[person]||[]);
+function deleteAddCard(){const editId=document.getElementById('addCardEditId').value;const person=document.getElementById('addCardPerson').value;if(!editId)return;if(!confirm('Excluir despesa?'))return;deleteManualCard(person,editId);closeModal('addCardModal');}
+function isManualCardInMonth(item,month){
+  const tipo=item.tipo||'recorrente';
+  if(tipo==='recorrente')return true;
+  const start=item.mesInicio||month;
+  const [cy,cm]=month.split('-').map(Number);
+  const [sy,sm]=start.split('-').map(Number);
+  const diff=(cy*12+cm)-(sy*12+sm);
+  if(tipo==='avista')return diff===0;
+  if(tipo==='parcelado')return diff>=0 && diff<(item.parcelas||1);
+  return true;
 }
-function getManualCardsTotal(person,month){return getManualCardsForMonth(person,month).reduce((s,i)=>s+(i.op==='subtrai'?-(i.valor||0):(i.valor||0)),0);}
+function getManualCardMonthValue(item){
+  const tipo=item.tipo||'recorrente';
+  if(tipo==='parcelado')return(item.valor||0)/(item.parcelas||1);
+  return item.valor||0;
+}
+function getManualCardParcelaLabel(item,month){
+  const tipo=item.tipo||'recorrente';
+  if(tipo==='recorrente')return'Mensal';
+  if(tipo==='avista')return'À vista';
+  const start=item.mesInicio||month;
+  const [cy,cm]=month.split('-').map(Number);
+  const [sy,sm]=start.split('-').map(Number);
+  return`${(cy*12+cm)-(sy*12+sm)+1}/${item.parcelas}x`;
+}
+function getManualCardsForMonth(person,month){
+  return ((DATA.manualCards||{})[person]||[]).filter(i=>isManualCardInMonth(i,month));
+}
+function getManualCardsTotal(person,month){return getManualCardsForMonth(person,month).reduce((s,i)=>s+(i.op==='subtrai'?-getManualCardMonthValue(i):getManualCardMonthValue(i)),0);}
 function renderManualCardsContainer(containerId,person){
   const c=document.getElementById(containerId);if(!c)return;
   const items=getManualCardsForMonth(person,currentMonth);
   let html='';
   if(items.length){
-    html+=items.map(i=>`<div class="card" style="margin-bottom:8px;padding:12px 14px;display:flex;align-items:center;gap:10px;"><div style="width:32px;height:32px;border-radius:var(--radius-xs);background:${i.op==='soma'?'rgba(0,184,148,0.1)':'rgba(214,48,49,0.1)'};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">${i.op==='soma'?'➕':'➖'}</div><div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:12px;">${i.descricao}</div><div style="font-size:10px;color:var(--text-secondary);">${i.op==='soma'?'Soma ao total':'Subtrai do total'}</div></div><div style="font-weight:700;font-size:14px;color:${i.op==='subtrai'?'var(--danger)':'var(--success)'};">${i.op==='subtrai'?'-':'+'} ${formatMoney(i.valor)}</div><div style="display:flex;gap:3px;"><button class="btn-icon" onclick="openAddCardModal('${person}','${i.id}')">✎</button><button class="btn-icon" onclick="deleteManualCard('${person}','${i.id}')" style="color:var(--danger)">✕</button></div></div>`).join('');
+    html+=items.map(i=>`<div class="card" style="margin-bottom:8px;padding:12px 14px;display:flex;align-items:center;gap:10px;"><div style="width:32px;height:32px;border-radius:var(--radius-xs);background:${i.op==='soma'?'rgba(0,184,148,0.1)':'rgba(214,48,49,0.1)'};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">${i.op==='soma'?'➕':'➖'}</div><div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:12px;">${i.descricao}</div><div style="font-size:10px;color:var(--text-secondary);">${getManualCardParcelaLabel(i,currentMonth)} · ${i.op==='soma'?'Soma':'Subtrai'}</div></div><div style="font-weight:700;font-size:14px;color:${i.op==='subtrai'?'var(--danger)':'var(--success)'};">${i.op==='subtrai'?'-':'+'} ${formatMoney(getManualCardMonthValue(i))}</div><div style="display:flex;gap:3px;"><button class="btn-icon" onclick="openAddCardModal('${person}','${i.id}')">✎</button><button class="btn-icon" onclick="deleteManualCard('${person}','${i.id}')" style="color:var(--danger)">✕</button></div></div>`).join('');
   }
-  html+=`<div style="display:flex;align-items:center;gap:10px;margin-top:${items.length?'10px':'0'};"><span style="font-family:var(--font-display);font-weight:700;font-size:13px;"></span><button class="btn btn-outline btn-sm" onclick="openAddCardModal('${person}')"> Adicionar Card</button></div>`;
+  
   c.innerHTML=html;
 }
+function renderPersonDespesasTable(person,tbodyId){
+  const tbody=document.getElementById(tbodyId);if(!tbody)return;
+  const cardExps=(DATA.cartao||[]).filter(e=>isExpenseInMonth(e,currentMonth)&&e.quemPaga&&e.quemPaga.includes(person));
+  const addedExps=getManualCardsForMonth(person,currentMonth);
+  let html=cardExps.map(e=>`<tr><td>${e.descricao||e.loja||''}</td><td>${getParcelaLabel(e,currentMonth)}</td><td><strong>${formatMoney(getPersonShare(e,person))}</strong></td><td></td></tr>`).join('');
+  if(addedExps.length){
+    html+=addedExps.map(i=>{
+      const isSub=i.op==='subtrai';
+      const valTxt=isSub?`<strong style="color:var(--danger)">- ${formatMoney(getManualCardMonthValue(i))}</strong>`:`<strong>${formatMoney(getManualCardMonthValue(i))}</strong>`;
+      return`<tr><td><span style="cursor:pointer" onclick="openAddCardModal('${person}','${i.id}')">${i.descricao||''}</span></td><td>${getManualCardParcelaLabel(i,currentMonth)}</td><td>${valTxt}</td><td></td></tr>`;
+    }).join('');
+  }
+  if(!html)html=`<tr><td colspan="4" style="text-align:center;color:var(--text-secondary);padding:14px;">Nenhuma despesa neste mês</td></tr>`;
+  tbody.innerHTML=html;
+}
+
+
 
 // ===== CONFIG =====
 function renderConfig(){
