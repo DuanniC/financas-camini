@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Financeiro">
@@ -59,7 +59,7 @@ body::before { content:""; position:fixed; inset:0; background:
 
 ::-webkit-scrollbar { width:6px; height:6px; }
 ::-webkit-scrollbar-track { background:transparent; }
-::-webkit-scrollbar-thumb { background:var(--accent3); border-radius:4px; }
+::-webkit-scrollbar-thumb { background:var(--bg); border-radius:4px; }
 ::-webkit-scrollbar-thumb:hover { background:var(--accent2); }
 
 /* ===== LAYOUT ===== */
@@ -221,7 +221,7 @@ tbody tr:last-child td { border-bottom:none; }
 @keyframes pageIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
 
 /* ===== AUTH ===== */
-.auth-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:var(--gradient-warm); z-index:1000; display:flex; align-items:center; justify-content:center; }
+.auth-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:var(--bg); z-index:1000; display:flex; align-items:center; justify-content:center; }
 .auth-overlay.hidden { display:none; }
 .auth-box { text-align:center; padding:32px; background:var(--card-bg); border-radius:28px; box-shadow:var(--shadow-lg); border:1px solid var(--border-soft); max-width:380px; width:90%; }
 .auth-box .logo-big { width:84px; height:84px; border-radius:24px; background:var(--gradient1); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:34px; font-family:var(--font-display); margin:0 auto 22px; box-shadow:0 12px 28px rgba(201,123,156,0.40); letter-spacing:-1px; }
@@ -293,8 +293,8 @@ tbody tr:last-child td { border-bottom:none; }
   .sidebar.open { transform:translateX(0); }
   .sidebar-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(58,45,51,0.35); backdrop-filter:blur(4px); z-index:99; display:none; }
   .sidebar-overlay.open { display:block; }
-  .main-content { margin-left:0; padding:16px 16px; padding-top:68px; }
-  .mobile-header { display:flex; align-items:center; gap:12px; padding:12px 16px; background:var(--card-glass); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border-bottom:1px solid var(--border-soft); position:fixed; top:0; left:0; right:0; z-index:50; }
+  .mobile-header { display:flex; align-items:center; gap:12px; padding:12px 16px; padding-top:calc(12px + env(safe-area-inset-top)); background:var(--bg); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border-bottom:1px solid var(--border-soft); position:fixed; top:0; left:0; right:0; z-index:50; box-shadow:0 2px 10px rgba(122,106,184,0.12); }
+  .main-content { margin-left:0; padding:16px 16px; padding-top:calc(80px + env(safe-area-inset-top)); }
   .hamburger { width:38px; height:38px; border:none; background:none; cursor:pointer; font-size:20px; color:var(--plum); }
   .page-header { gap:10px; }
   .page-title { font-size:24px; }
@@ -315,7 +315,8 @@ tbody tr:last-child td { border-bottom:none; }
   table { font-size:12px; }
   thead th { padding:8px 8px; font-size:9.5px; }
   tbody td { padding:10px 8px; }
-  .modal { padding:20px; max-width:100%; border-radius:20px; }
+  .modal-overlay { padding:12px; }
+  .modal { padding:20px; max-width:100%; border-radius:20px; margin:0; }
   .bubble .bubble-value { font-size:19px; }
   .hide-mobile { display:none !important; }
   .show-mobile-only { display:block !important; }
@@ -361,7 +362,7 @@ tbody tr:last-child td { border-bottom:none; }
 </div>
 
 <!-- PERSONAL PAGE (full overlay with rosy background) -->
-<div id="personalPage" class="hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(135deg,#faf5f0 0%,#f4d9d9 50%,#e8c4d4 100%);z-index:800;display:flex;flex-direction:column;overflow-y:auto;">
+<div id="personalPage" class="hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#eef0fb;z-index:800;display:flex;flex-direction:column;overflow-y:auto;">
   <div style="display:flex;align-items:center;padding:16px 20px;background:rgba(255,255,255,0.8);backdrop-filter:blur(8px);border-bottom:1px solid rgba(232,67,147,0.2);position:sticky;top:0;z-index:10;">
     <div style="width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#e84393,#fd79a8);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:15px;margin-right:10px;">F</div>
     <span style="font-family:var(--font-display);font-weight:700;font-size:17px;color:#c2185b;">Pessoal</span>
@@ -785,7 +786,7 @@ tbody tr:last-child td { border-bottom:none; }
         <input type="checkbox" id="peDevo" style="width:16px;height:16px;accent-color:#e84393;display:inline;"> 💕 Cartão do meu amor — descontar do total do Alan
       </label>
     </div>
-    <div style="display:flex;gap:6px;justify-content:flex-end;"><button class="btn btn-outline" onclick="closeModal('personalExpModal')">Cancelar</button><button class="btn btn-primary" onclick="savePersonalExpense()">Salvar</button></div>
+    <div style="display:flex;gap:6px;justify-content:flex-end;align-items:center;"><button class="btn btn-outline" onclick="closeModal('personalExpModal')">Cancelar</button><button id="peDeleteBtn" class="btn btn-danger" style="display:none;" onclick="deletePersonalExpenseFromModal()">🗑 Excluir</button><button class="btn btn-primary" onclick="savePersonalExpense()">Salvar</button></div>
     <input type="hidden" id="peEditId"><input type="hidden" id="pePerson">
   </div>
 </div>
@@ -1150,7 +1151,7 @@ function renderCartaoTable(){
       const desc=e.descricao||e.loja||'';
       const loja=e.loja||'';
       const catIcon=getCategoryIcon(e.categoria);
-      return`<div class="expense-item">
+      return`<div class="expense-item" onclick="editExpense('${e.id}')" style="cursor:pointer;">
         <div class="ei-icon cat-${e.categoria||'outros'}">${catIcon}</div>
         <div class="ei-info">
           <div class="ei-name">${desc}${loja&&desc!==loja?' <span style="color:var(--text-secondary);font-weight:400;">· '+loja+'</span>':''}</div>
@@ -1158,8 +1159,7 @@ function renderCartaoTable(){
         </div>
         <div class="ei-value">${formatMoney(mv)}</div>
         <div class="ei-actions">
-          <button class="btn-icon" onclick="editExpense('${e.id}')">✎</button>
-          <button class="btn-icon" onclick="deleteExpense('${e.id}')" style="color:var(--danger)">✕</button>
+          <button class="btn-icon" onclick="event.stopPropagation();deleteExpense('${e.id}')" style="color:var(--danger)">✕</button>
         </div>
       </div>`;
     }).join('');
@@ -1284,9 +1284,12 @@ function openPersonalExpenseModal(person,editId){
   const devoCb=document.getElementById('peDevo');
   if(person==='duanni'){devoGrp.style.display='block';devoCb.checked=editId?isDevo(editId):false;}
   else{devoGrp.style.display='none';devoCb.checked=false;}
+  const peDeleteBtn=document.getElementById('peDeleteBtn');
+  if(peDeleteBtn)peDeleteBtn.style.display=editId?'':'none';
   openModal('personalExpModal');
 }
 function onPeTipoChange(){document.getElementById('peParcelasGroup').style.display=document.getElementById('peTipo').value==='parcelado'?'':'none';updateParcelaPreview('pe');}
+function deletePersonalExpenseFromModal(){const editId=document.getElementById('peEditId').value;if(!editId)return;if(!confirm('Excluir esta despesa?'))return;DATA.pessoal=(DATA.pessoal||[]).filter(e=>e.id!==editId);DATA.devoIds=(DATA.devoIds||[]).filter(d=>d!==editId);scheduleSave();closeModal('personalExpModal');renderAll();showToast('Exclu\u00edda');}
 function savePersonalExpense(){
   const desc=document.getElementById('peDesc').value.trim();if(!desc)return showToast('Preencha','error');
   const valor=parseFloat(document.getElementById('peValor').value)||0;if(valor<=0)return showToast('Valor','error');
@@ -1347,11 +1350,11 @@ function renderDuanniInicio(){
   const list=document.getElementById('duanniPersonalList'),empty=document.getElementById('duanniPersonalEmpty');
   if(!pExps.length){list.innerHTML='';empty.classList.remove('hidden');return;}
   empty.classList.add('hidden');
-  list.innerHTML=pExps.map(e=>{const paid=(DATA.cartaoStatus||[]).includes(`pe_${currentMonth}_${e.id}`);const parcLabel=e.tipo==='parcelado'&&e.parcelas>1?' · '+getParcelaLabel(e,currentMonth):'';const devo=isDevo(e.id);return`<div class="expense-item">
+  list.innerHTML=pExps.map(e=>{const paid=(DATA.cartaoStatus||[]).includes(`pe_${currentMonth}_${e.id}`);const parcLabel=e.tipo==='parcelado'&&e.parcelas>1?' · '+getParcelaLabel(e,currentMonth):'';const devo=isDevo(e.id);return`<div class="expense-item" onclick="openPersonalExpenseModal('duanni','${e.id}')" style="cursor:pointer;">
     <div class="ei-icon cat-${e.categoria||'outros'}">${getCategoryIcon(e.categoria)}</div>
     <div class="ei-info"><div class="ei-name">${e.descricao}${devo?' <span style="font-size:10px;color:#e84393;">💕</span>':''}</div><div class="ei-detail">${capitalize(e.categoria||'')}${parcLabel} · Dia ${e.dia||'-'} · ${e.banco||''}</div></div>
     <div class="ei-value">${formatMoney(getMonthValue(e))}</div>
-    <div class="ei-actions"><button class="btn-icon ${paid?'btn-success':''}" onclick="togglePersonalStatus('${e.id}')">${paid?'✓':'○'}</button><button class="btn-icon" onclick="openPersonalExpenseModal('duanni','${e.id}')">✎</button><button class="btn-icon" onclick="deletePersonalExpense('${e.id}')" style="color:var(--danger)">✕</button></div>
+    <div class="ei-actions"><button class="btn-icon ${paid?'btn-success':''}" onclick="event.stopPropagation();togglePersonalStatus('${e.id}')">${paid?'✓':'○'}</button></div>
   </div>`;}).join('');
 }
 
