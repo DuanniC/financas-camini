@@ -50,7 +50,7 @@
   --font-display: 'Outfit', system-ui, sans-serif;
 }
 * { margin:0; padding:0; box-sizing:border-box; }
-body { font-family: var(--font); background: var(--bg); color: var(--text); min-height:100vh; -webkit-tap-highlight-color:transparent; font-feature-settings: "ss01","cv11"; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); min-height:100vh; -webkit-tap-highlight-color:transparent; font-feature-settings: "ss01","cv11"; overflow-x:hidden; }
 body::before { content:""; position:fixed; inset:0; background:
   radial-gradient(circle at 12% 8%, rgba(201,123,156,0.10), transparent 38%),
   radial-gradient(circle at 88% 92%, rgba(184,155,191,0.10), transparent 42%),
@@ -1998,8 +1998,54 @@ function renderApto(){
   document.getElementById('aluguelValor').value=(DATA.aluguel||{}).valor||'';
   document.getElementById('aluguelOp').value=(DATA.aluguel||{}).op||'soma';
   const descontos=DATA.aluguelDescontos||[];
-  const activeDescontos=descontos.filter(d=>isDescontoInMonth(d,currentMonth));
-  document.getElementById('aluguelDescontos').innerHTML=!descontos.length?'<p style="color:var(--text-secondary);font-size:12px;">Nenhum</p>':descontos.map(d=>{const active=isDescontoInMonth(d,currentMonth);return`<div class="apto-item" style="${active?'':'opacity:0.5'}"><div><strong>${d.descricao||''}</strong> <span class="badge ${d.op==='subtrai'?'badge-paid':'badge-pending'}">${d.op==='subtrai'?'Desconto':'Acréscimo'}</span><div style="font-size:10px;color:var(--text-secondary);">Início: ${d.mesInicio||'—'} · ${d.parcelas?d.parcelas+'x':'Sem fim'}</div></div><div style="display:flex;align-items:center;gap:4px;"><strong>${formatMoney(d.valor)}</strong><button class="btn-icon" onclick="openDescontoModal('${d.id}')">✎</button><button class="btn-icon" onclick="deleteDesconto('${d.id}')" style="color:var(--danger)">✕</button></div></div>`;}).join('');
+  const aluguelBase=(DATA.aluguel||{}).valor||0;
+  const aluguelOp=(DATA.aluguel||{}).op||'soma';
+  const aluguelSinal=aluguelOp==='subtrai'?-1:1;
+  const aluguelLiquido=getAluguelForMonth(currentMonth);
+
+  // Monta conta visual
+  const monthNames=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  function fimParcela(mesInicio,parcelas){
+    if(!parcelas||parcelas===0)return null;
+    const[sy,sm]=mesInicio.split('-').map(Number);
+    const d=new Date(sy,sm-1+parcelas-1,1);
+    return `${monthNames[d.getMonth()]}/${d.getFullYear()}`;
+  }
+
+  let contaHtml=`<div style="background:var(--bg-soft);border:1px solid var(--border-soft);border-radius:14px;padding:14px 16px;margin-bottom:14px;">`;
+  contaHtml+=`<div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:10px;border-bottom:1px solid var(--border-soft);margin-bottom:10px;">
+    <span style="font-size:13px;font-weight:700;">Aluguel base</span>
+    <span style="font-size:14px;font-weight:800;color:var(--text);">${formatMoney(aluguelBase)}</span>
+  </div>`;
+
+  if(descontos.length){
+    descontos.forEach(d=>{
+      const active=isDescontoInMonth(d,currentMonth);
+      const sinal=d.op==='subtrai'?'−':'+';
+      const cor=d.op==='subtrai'?'var(--danger)':'var(--success)';
+      const fim=fimParcela(d.mesInicio,d.parcelas);
+      const parcelaLabel=d.parcelas?`${d.parcelas}x${fim?' · até '+fim:''}`:' Sem fim';
+      contaHtml+=`<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:7px 0;border-bottom:1px dashed var(--border-soft);opacity:${active?'1':'0.45'};">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12px;font-weight:600;">${d.descricao||''} <span style="font-size:10px;font-weight:500;color:${d.op==='subtrai'?'var(--danger)':'var(--success)'};">${d.op==='subtrai'?'Desconto':'Acréscimo'}</span></div>
+          <div style="font-size:10px;color:var(--text-secondary);">Início: ${d.mesInicio||'—'} · ${parcelaLabel}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;margin-left:8px;">
+          <span style="font-size:13px;font-weight:700;color:${cor};">${sinal} ${formatMoney(d.valor)}</span>
+          <button class="btn-icon" onclick="openDescontoModal('${d.id}')">✎</button>
+          <button class="btn-icon" onclick="deleteDesconto('${d.id}')" style="color:var(--danger)">✕</button>
+        </div>
+      </div>`;
+    });
+  }
+
+  contaHtml+=`<div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;margin-top:4px;">
+    <span style="font-size:12px;font-weight:700;color:var(--text-secondary);">TOTAL A RECEBER</span>
+    <span style="font-size:18px;font-weight:800;color:${aluguelLiquido>=0?'var(--success)':'var(--danger)'};">${formatMoney(Math.abs(aluguelLiquido))}</span>
+  </div>`;
+  contaHtml+=`</div>`;
+
+  document.getElementById('aluguelDescontos').innerHTML=contaHtml+(descontos.length===0?'<p style="color:var(--text-secondary);font-size:12px;margin-top:4px;">Nenhum desconto ou acréscimo</p>':'');
 
   // Extras tab
   const extras=getAptoItems(currentMonth).filter(i=>i.tipo==='extra');
