@@ -338,6 +338,14 @@ tbody tr:last-child td { border-bottom:none; }
   .modal .form-row-3 { grid-template-columns:1fr; gap:0; }
   .modal .form-group { margin-bottom:12px; min-width:0; }
   .modal .form-group input[type="month"] { -webkit-appearance:none; appearance:none; width:100%; min-width:0; display:block; box-sizing:border-box; }
+  /* Cartões expansíveis (Adicionar Aporte / Retirar da Meta etc.) tinham o mesmo
+     problema dos modais: form-row-2 mantinha 2 colunas, o input de data (largura
+     mínima maior no iOS) estourava a coluna e sobrepunha o campo vizinho. */
+  .expandable-body .form-row { min-width:0; }
+  .expandable-body .form-row-2, .expandable-body .form-row-3 { grid-template-columns:1fr; gap:0; }
+  .expandable-body .form-group { margin-bottom:12px; min-width:0; }
+  .expandable-body input, .expandable-body select, .expandable-body textarea { min-width:0; width:100%; max-width:100%; box-sizing:border-box; }
+  .expandable-body input[type="date"] { -webkit-appearance:none; appearance:none; }
   .modal .modal-header { margin-bottom:16px; }
   .modal .modal-header h3 { font-size:17px; }
   .modal-close { width:34px; height:34px; font-size:17px; }
