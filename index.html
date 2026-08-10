@@ -132,6 +132,11 @@ body::before { content:""; position:fixed; inset:0; background:
 /* ===== TABLE ===== */
 .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
 table { width:100%; border-collapse:collapse; font-size:13px; }
+.collapsible-title { cursor:pointer; user-select:none; margin-bottom:0; }
+.collapsible-title .collapse-arrow { margin-left:auto; transition:transform .25s ease; font-size:14px; opacity:.6; }
+.collapsible-title.open .collapse-arrow { transform:rotate(180deg); }
+.collapse-body { margin-top:16px; }
+.collapse-body.collapsed { display:none; }
 thead th { text-align:left; padding:12px 12px; font-weight:600; color:var(--text-secondary); font-size:10px; text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid var(--border); white-space:nowrap; }
 tbody td { padding:12px 12px; border-bottom:1px solid var(--border-soft); vertical-align:middle; }
 tbody tr { transition:background 0.15s; }
@@ -503,6 +508,7 @@ tbody tr:last-child td { border-bottom:none; }
         <div id="duanniPersonalList"></div>
         <div class="empty-state hidden" id="duanniPersonalEmpty"><div class="empty-icon">📋</div><p>Nenhuma despesa pessoal neste mês</p></div>
       </div>
+      <div class="card" style="margin-bottom:14px;"><div class="card-title collapsible-title" onclick="toggleCollapse(this)" id="duanniCartaoTitle">Despesas do Cartão<span class="collapse-arrow">▾</span></div><div class="collapse-body collapsed" id="duanniCartaoCollapse"><div class="table-wrap"><table><thead><tr><th>Descrição</th><th>Parc</th><th>Valor</th><th></th></tr></thead><tbody id="duanniCartaoBody"></tbody></table></div></div></div>
       <div id="duanniAddCardContainer" style="margin-top:20px;"></div>
     </div>
     <div class="sub-page" id="duanni-meta">
@@ -1368,6 +1374,8 @@ function toggleDevo(id){
 function isDevo(id){return(DATA.devoIds||[]).includes(id);}
 
 // ===== RENDER: DUANNI INICIO =====
+
+function toggleCollapse(el){const body=el.nextElementSibling;if(!body)return;const willOpen=body.classList.contains('collapsed');body.classList.toggle('collapsed',!willOpen);el.classList.toggle('open',willOpen);}
 function renderDuanniInicio(){
   renderManualCardsContainer('duanniAddCardContainer','duanni');
   const cartaoT=getPersonCartaoTotal('duanni',currentMonth);
@@ -1380,6 +1388,7 @@ function renderDuanniInicio(){
   const separadoDet=`Apto: ${formatMoney(aptoT)}<br>Pessoal: ${formatMoney(pTotal)}`;
   const receita=getReceitaDoMes(currentMonth);
   const saldoLivre=receita-grand;
+  renderPersonDespesasTable('duanni','duanniCartaoBody');
   const s=document.getElementById('duanniSummary');if(!s)return;
   s.innerHTML=`<div class="bubble bubble-pink"><div class="bubble-label">Total</div><div class="bubble-value">${formatMoney(grand)}</div></div>
     <div class="bubble bubble-purple"><div class="bubble-label">Cartão</div><div class="bubble-value">${formatMoney(cartaoT)}</div><div class="bubble-sub">${cardDet}</div></div>
