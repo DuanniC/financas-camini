@@ -219,6 +219,24 @@ tbody tr:last-child td { border-bottom:none; }
 .badge { padding:3px 10px; border-radius:999px; font-size:10.5px; font-weight:600; letter-spacing:0.2px; }
 .badge-paid { background:rgba(127,166,122,0.16); color:#5e8159; }
 .badge-pending { background:rgba(217,168,107,0.20); color:#a87a43; }
+.badge-notfound { background:rgba(212,138,138,0.18); color:#a85a5a; }
+.badge-waiting { background:rgba(143,184,224,0.20); color:#4a7aa8; }
+.conf-row { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--border-soft); flex-wrap:wrap; }
+.conf-row:last-child { border-bottom:none; }
+.conf-info { flex:1; min-width:160px; }
+.conf-info .ei-name { font-weight:600; font-size:13px; color:var(--plum); }
+.conf-info .ei-detail { font-size:11px; color:var(--text-secondary); margin-top:2px; }
+.conf-value { font-weight:700; font-size:13.5px; font-family:var(--font-display); color:var(--plum); min-width:80px; text-align:right; }
+.conf-actions { display:flex; gap:6px; flex-wrap:wrap; }
+.conf-btn { border:1px solid var(--border); background:var(--card-bg); color:var(--text-secondary); font-size:11px; font-weight:600; padding:7px 11px; border-radius:999px; cursor:pointer; transition:all 0.2s; white-space:nowrap; }
+.conf-btn:hover { border-color:var(--accent); color:var(--accent-deep); }
+.conf-btn.active-validar { background:var(--success); color:#fff; border-color:var(--success); }
+.conf-btn.active-espera { background:var(--accent2); color:#fff; border-color:var(--accent2); }
+.conf-btn.active-nao { background:var(--danger); color:#fff; border-color:var(--danger); }
+.conf-summary { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
+.conf-summary .cs-item { flex:1; min-width:110px; background:var(--bg-soft); border-radius:var(--radius-sm); padding:12px 14px; text-align:center; }
+.conf-summary .cs-num { font-family:var(--font-display); font-weight:700; font-size:20px; color:var(--plum); }
+.conf-summary .cs-label { font-size:10.5px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.4px; margin-top:2px; }
 
 /* ===== PROGRESS BAR ===== */
 .progress-bar { height:8px; background:rgba(93,73,84,0.06); border-radius:999px; overflow:hidden; }
@@ -696,6 +714,11 @@ tbody tr:last-child td { border-bottom:none; }
   <!-- ===== CONFIG ===== -->
   <div class="page" id="page-config">
     <div class="page-header"><h1 class="page-title">Configurações</h1></div>
+    <div class="sub-tab-bar">
+      <div class="sub-tab active" data-subtab="config-geral" onclick="switchSubTab('config','config-geral')">Geral</div>
+      <div class="sub-tab" data-subtab="config-conferencia" onclick="switchSubTab('config','config-conferencia')">🔍 Conferência</div>
+    </div>
+    <div class="sub-page active" id="config-geral">
     <div class="grid-2">
       <div class="card">
         <div class="card-title">Pessoas</div>
@@ -773,6 +796,22 @@ tbody tr:last-child td { border-bottom:none; }
       <div class="card-title">Divisão Apartamento</div>
       <div id="configDivisao"></div>
       <button class="btn btn-primary" style="margin-top:8px;" onclick="saveDivisaoConfig()">Salvar</button>
+    </div>
+    </div>
+
+    <!-- ===== CONFERÊNCIA DE INFORMAÇÕES ===== -->
+    <div class="sub-page" id="config-conferencia">
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-title">
+          Conferência do Compartilhado
+          <span class="badge badge-pending" id="confMonthLabel" style="margin-left:auto;"></span>
+        </div>
+        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:14px;">Confira se cada despesa cadastrada realmente bate com o que caiu no cartão. Não é preciso justificar nada — é só marcar o que já foi conferido. Mostra sempre o mês vigente do cartão (considerando o dia de corte).</p>
+        <div class="conf-summary" id="confSummary"></div>
+        <div class="filter-row" id="confFilter" style="margin-bottom:10px;"></div>
+        <div id="confList"></div>
+        <div class="empty-state hidden" id="confEmpty"><div class="empty-icon">🔍</div><p>Nenhuma despesa neste mês</p></div>
+      </div>
     </div>
   </div>
 
@@ -913,7 +952,7 @@ const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 function supaFetch(path,opts={}){return fetch(`${SUPA_URL}/rest/v1/${path}`,{...opts,headers:{'apikey':SUPA_KEY,'Authorization':`Bearer ${SUPA_KEY}`,'Content-Type':'application/json','Prefer':opts.method==='PATCH'||opts.method==='POST'?'return=representation':undefined,...opts.headers}});}
 
 // ===== STATE =====
-let DATA={cartao:[],pessoal:[],apto:{},bancos:['Itaú','PagBank','Nubank','Bradesco'],cartoesBanco:['Itaú','PagBank'],pessoas:['duanni','alan','ronaldo','sueli'],divisao:{duanni:50,alan:50},diaCorte:8,cartaoStatus:[],devoIds:[],devoConfig:{titulo:'💕 cartão do meu amor',legenda:'despesas minhas no cartão dele · subtraído do total'},customData:[],receitaMensal:0,receitaPorMes:{},simulacoes:[],caixa:{},aluguel:{},aluguelDescontos:[],amorItems:[],manualCards:{},categorias:[{id:'compras',nome:'Compras',icone:'🛒'},{id:'alimentacao',nome:'Alimentação',icone:'🍔'},{id:'assinaturas',nome:'Assinaturas',icone:'📝'},{id:'streamings',nome:'Streamings',icone:'📺'},{id:'saude',nome:'Saúde/Beleza',icone:'💊'},{id:'lazer',nome:'Lazer',icone:'🎮'},{id:'presentes',nome:'Presentes',icone:'🎁'},{id:'snow',nome:'Snow 🐶',icone:'🐶'},{id:'poupanca',nome:'Poupança',icone:'🏦'},{id:'outros',nome:'Outros',icone:'📦'}]};
+let DATA={cartao:[],pessoal:[],apto:{},bancos:['Itaú','PagBank','Nubank','Bradesco'],cartoesBanco:['Itaú','PagBank'],pessoas:['duanni','alan','ronaldo','sueli'],divisao:{duanni:50,alan:50},diaCorte:8,cartaoStatus:[],devoIds:[],devoConfig:{titulo:'💕 cartão do meu amor',legenda:'despesas minhas no cartão dele · subtraído do total'},customData:[],receitaMensal:0,receitaPorMes:{},simulacoes:[],caixa:{},aluguel:{},aluguelDescontos:[],amorItems:[],manualCards:{},conferencia:{},categorias:[{id:'compras',nome:'Compras',icone:'🛒'},{id:'alimentacao',nome:'Alimentação',icone:'🍔'},{id:'assinaturas',nome:'Assinaturas',icone:'📝'},{id:'streamings',nome:'Streamings',icone:'📺'},{id:'saude',nome:'Saúde/Beleza',icone:'💊'},{id:'lazer',nome:'Lazer',icone:'🎮'},{id:'presentes',nome:'Presentes',icone:'🎁'},{id:'snow',nome:'Snow 🐶',icone:'🐶'},{id:'poupanca',nome:'Poupança',icone:'🏦'},{id:'outros',nome:'Outros',icone:'📦'}]};
 let currentMonth=new Date().toISOString().slice(0,7);
 let currentPage='page-cartao';
 let currentCartao='';
@@ -971,6 +1010,7 @@ async function loadData(){
   if(!DATA.caixa)DATA.caixa={};
   if(!DATA.aluguel)DATA.aluguel={};
   if(!DATA.aluguelDescontos)DATA.aluguelDescontos=[];
+  if(!DATA.conferencia)DATA.conferencia={};
   currentCartao=DATA.cartoesBanco[0]||'Itaú';
   renderAll();
   document.getElementById('lastSync').textContent='Sync: '+new Date().toLocaleTimeString('pt-BR');
@@ -1064,7 +1104,7 @@ function onMonthChange(){setMonthInputs(currentMonth);renderAll();}
 function changeMonth(d){const[y,m]=currentMonth.split('-').map(Number);const dt=new Date(y,m-1+d,1);currentMonth=formatYearMonthLocal(dt);setMonthInputs(currentMonth);renderAll();}
 
 // ===== RENDER ALL =====
-function renderAll(){renderCards();renderPersonFilter();renderCartaoTable();renderDuanniInicio();renderDuanniMeta();renderDuanniPlanejamento();renderDuanniSimular();renderDuanniControle();renderAlan();renderRonaldo();renderAllDynamicPersonPages();renderApto();renderConfig();}
+function renderAll(){renderCards();renderPersonFilter();renderCartaoTable();renderDuanniInicio();renderDuanniMeta();renderDuanniPlanejamento();renderDuanniSimular();renderDuanniControle();renderAlan();renderRonaldo();renderAllDynamicPersonPages();renderApto();renderConfig();renderConferencia();}
 
 // ===== HELPERS =====
 function capitalize(s){return s?s.charAt(0).toUpperCase()+s.slice(1):'';}
@@ -2311,6 +2351,83 @@ function renderConfig(){
   
   const dv=document.getElementById('configDivisao');
   if(dv)dv.innerHTML=Object.entries(DATA.divisao||{}).map(([p,pct])=>`<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;"><span style="width:70px;font-weight:600;font-size:13px;">${capitalize(p)}</span><input type="number" value="${pct}" min="0" max="100" class="divisao-input" data-person="${p}" style="width:70px;padding:5px;border:1px solid var(--border);border-radius:var(--radius-xs);"><span>%</span></div>`).join('');
+}
+
+// ===== CONFERÊNCIA DE INFORMAÇÕES =====
+let confFilterCartao='';
+function getConfMonth(){return getDefaultMesInicio();}
+function getConfKey(month,id){return `${month}_${id}`;}
+function getConfStatus(id){return (DATA.conferencia||{})[getConfKey(getConfMonth(),id)]||'';}
+function setConfStatus(id,status){
+  if(!DATA.conferencia)DATA.conferencia={};
+  const key=getConfKey(getConfMonth(),id);
+  if(DATA.conferencia[key]===status)delete DATA.conferencia[key]; // clicar de novo desmarca
+  else DATA.conferencia[key]=status;
+  scheduleSave();renderConferencia();
+}
+function setConfFilterCartao(c){confFilterCartao=c;renderConferencia();}
+function renderConferencia(){
+  const list=document.getElementById('confList');if(!list)return;
+  const empty=document.getElementById('confEmpty');
+  const filterEl=document.getElementById('confFilter');
+  const confMonth=getConfMonth();
+  const lbl=document.getElementById('confMonthLabel');
+  if(lbl){const monthNames=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];const[y,mo]=confMonth.split('-').map(Number);lbl.textContent=monthNames[mo-1]+'/'+y;}
+  if(filterEl){
+    filterEl.innerHTML=['Todos',...DATA.cartoesBanco].map(c=>{
+      const isA=(c==='Todos'&&!confFilterCartao)||confFilterCartao===c;
+      return `<div class="chip ${isA?'active':''}" onclick="setConfFilterCartao('${c==='Todos'?'':c}')">${c}</div>`;
+    }).join('');
+  }
+  let exps=getMonthExpenses(confMonth,confFilterCartao||undefined);
+  exps=exps.slice().sort((a,b)=>{
+    const order={'':0,nao_encontrado:1,nao_cobrado:2,validado:3};
+    const sa=order[getConfStatus(a.id)]??0, sb=order[getConfStatus(b.id)]??0;
+    if(sa!==sb)return sa-sb;
+    return (a.loja||'').localeCompare(b.loja||'');
+  });
+  if(!exps.length){list.innerHTML='';if(empty)empty.classList.remove('hidden');updateConfSummary([]);return;}
+  if(empty)empty.classList.add('hidden');
+  list.innerHTML=exps.map(e=>{
+    const status=getConfStatus(e.id);
+    const mv=getMonthValue(e);
+    const parcLabel=getParcelaLabel(e,confMonth);
+    const desc=e.descricao||e.loja||'';
+    const loja=e.loja||'';
+    let badge='';
+    if(status==='validado')badge='<span class="badge badge-paid">✓ Validado</span>';
+    else if(status==='nao_cobrado')badge='<span class="badge badge-waiting">🕓 Ainda não cobrado</span>';
+    else if(status==='nao_encontrado')badge='<span class="badge badge-notfound">❓ Não encontrado</span>';
+    else badge='<span class="badge badge-pending">Pendente</span>';
+    return `<div class="conf-row">
+      <div class="conf-info">
+        <div class="ei-name">${desc}${loja&&desc!==loja?' <span style="color:var(--text-secondary);font-weight:400;">· '+loja+'</span>':''}</div>
+        <div class="ei-detail">${parcLabel} · ${e.cartao||''} ${badge}</div>
+      </div>
+      <div class="conf-value">${formatMoney(mv)}</div>
+      <div class="conf-actions">
+        <button class="conf-btn ${status==='validado'?'active-validar':''}" onclick="setConfStatus('${e.id}','validado')">✓ Validar</button>
+        <button class="conf-btn ${status==='nao_cobrado'?'active-espera':''}" onclick="setConfStatus('${e.id}','nao_cobrado')">🕓 Ainda não cobrado</button>
+        <button class="conf-btn ${status==='nao_encontrado'?'active-nao':''}" onclick="setConfStatus('${e.id}','nao_encontrado')">❓ Não encontrado</button>
+      </div>
+    </div>`;
+  }).join('');
+  updateConfSummary(exps);
+}
+function updateConfSummary(exps){
+  const el=document.getElementById('confSummary');if(!el)return;
+  const total=exps.length;
+  let validado=0,naoCobrado=0,naoEncontrado=0,pendente=0;
+  exps.forEach(e=>{
+    const s=getConfStatus(e.id);
+    if(s==='validado')validado++;else if(s==='nao_cobrado')naoCobrado++;else if(s==='nao_encontrado')naoEncontrado++;else pendente++;
+  });
+  el.innerHTML=`
+    <div class="cs-item"><div class="cs-num">${total}</div><div class="cs-label">Total</div></div>
+    <div class="cs-item"><div class="cs-num" style="color:var(--success)">${validado}</div><div class="cs-label">Validadas</div></div>
+    <div class="cs-item"><div class="cs-num" style="color:#a87a43">${pendente}</div><div class="cs-label">Pendentes</div></div>
+    <div class="cs-item"><div class="cs-num" style="color:#4a7aa8">${naoCobrado}</div><div class="cs-label">Não cobradas</div></div>
+    <div class="cs-item"><div class="cs-num" style="color:var(--danger)">${naoEncontrado}</div><div class="cs-label">Não encontradas</div></div>`;
 }
 function addPessoa(){const n=document.getElementById('newPessoaName').value.trim().toLowerCase();if(!n)return;if(!DATA.pessoas.includes(n))DATA.pessoas.push(n);document.getElementById('newPessoaName').value='';scheduleSave();renderAll();showToast('Adicionada');}
 function deletePessoa(idx){
