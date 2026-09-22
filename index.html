@@ -499,7 +499,7 @@ tbody tr:last-child td { border-bottom:none; }
       <!-- Desktop: tabela -->
       <div class="table-wrap hide-mobile">
         <table id="cartaoTable">
-          <thead><tr><th>Loja</th><th>Desc</th><th>Parc</th><th>Total</th><th>Mês</th><th>Quem paga</th><th></th></tr></thead>
+          <thead><tr><th>Data</th><th>Loja</th><th>Desc</th><th>Parc</th><th>Total</th><th>Mês</th><th>Quem paga</th><th></th></tr></thead>
           <tbody id="cartaoBody"></tbody>
         </table>
       </div>
@@ -827,7 +827,10 @@ tbody tr:last-child td { border-bottom:none; }
       <div class="form-group"><label>Loja</label><input type="text" id="expLoja"></div>
       <div class="form-group"><label>Descrição</label><input type="text" id="expDesc"></div>
     </div>
-    <div class="form-group"><label>Tipo</label><select id="expTipo" onchange="onExpTipoChange()"><option value="parcelado">Parcelado</option><option value="recorrente">Recorrente</option><option value="avista">À vista</option></select></div>
+    <div class="form-row form-row-2">
+      <div class="form-group"><label>Tipo</label><select id="expTipo" onchange="onExpTipoChange()"><option value="parcelado">Parcelado</option><option value="recorrente">Recorrente</option><option value="avista">À vista</option></select></div>
+      <div class="form-group"><label>Data da Compra</label><input type="date" id="expDataCompra"></div>
+    </div>
     <div class="form-row form-row-3">
       <div class="form-group"><label>Valor (R$)</label><input type="number" id="expValor" step="0.01" oninput="updateExpDivisaoStatus()"></div>
       <div class="form-group" id="expParcelasGroup"><label>Parcelas</label><input type="number" id="expParcelas" value="1" min="1" oninput="updateParcelaPreview('exp');updateExpDivisaoStatus()"></div>
@@ -1091,6 +1094,21 @@ function toggleExpandable(el){el.closest('.expandable').classList.toggle('open')
 
 // ===== MONTH =====
 function formatYearMonthLocal(date){return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;}
+function getExpenseSortDate(e){return e.dataCompra||(e.mesInicio?e.mesInicio+'-01':'0000-00-00');}
+// Para despesas recorrentes, a cobrança repete todo mês no MESMO DIA da dataCompra original
+// (ex: comprada em 09/09 -> cobra 09/10, 09/11, ...). Esta função calcula a data "efetiva"
+// daquela cobrança no mês que está sendo visto, mantendo o dia e trocando o mês/ano.
+function getEffectiveDate(exp,month){
+  if(exp.tipo==='recorrente'&&exp.dataCompra){
+    const day=parseInt(exp.dataCompra.slice(8,10),10)||1;
+    const[my,mm]=(month||exp.dataCompra.slice(0,7)).split('-').map(Number);
+    const lastDay=new Date(my,mm,0).getDate(); // trata meses com menos dias (ex: dia 31 em fevereiro)
+    const d=Math.min(day,lastDay);
+    return`${month}-${String(d).padStart(2,'0')}`;
+  }
+  return getExpenseSortDate(exp);
+}
+function formatDateBR(dateStr){if(!dateStr)return'';const[y,m,d]=dateStr.split('-');return d&&m?`${d}/${m}`:'';}
 function getDefaultMesInicio(){
   const hoje=new Date();
   const diaCorte=DATA.diaCorte||8;
@@ -1210,8 +1228,8 @@ function renderCartaoTable(){
   if(currentFilter)exps=exps.filter(e=>e.quemPaga&&e.quemPaga.includes(currentFilter));
   if(!exps.length){tbody.innerHTML='';if(mobileList)mobileList.innerHTML='';empty.classList.remove('hidden');return;}
   empty.classList.add('hidden');
-  // Sort by quem paga alphabetically
-  exps.sort((a,b)=>{const aQ=(a.quemPaga||[]).sort().join(',');const bQ=(b.quemPaga||[]).sort().join(',');return aQ.localeCompare(bQ);});
+  // Sort by data da cobrança no mês atual (mais recente -> mais antiga; recorrente usa o dia original todo mês)
+  exps.sort((a,b)=>getEffectiveDate(b,currentMonth).localeCompare(getEffectiveDate(a,currentMonth)));
   // Desktop: tabela
   tbody.innerHTML=exps.map(e=>{
     const mv=getMonthValue(e);
@@ -1223,6 +1241,7 @@ function renderCartaoTable(){
       else{const each=mv/payers.length;quemCol=payers.map(p=>`<span style="white-space:nowrap;">${capitalize(p)} <span style="color:var(--text-secondary);font-size:10px;">${formatMoney(each)}</span></span>`).join(', ');}
     }
     return`<tr>
+    <td style="font-size:11px;color:var(--text-secondary);white-space:nowrap;">${formatDateBR(getEffectiveDate(e,currentMonth))}</td>
     <td><strong>${e.loja||''}</strong></td><td>${e.descricao||''}</td><td>${getParcelaLabel(e,currentMonth)}</td>
     <td>${formatMoney(e.valor)}</td><td><strong>${formatMoney(mv)}</strong></td>
     <td style="font-size:11px;">${quemCol}</td>
@@ -1234,6 +1253,7 @@ function renderCartaoTable(){
       const mv=getMonthValue(e);
       const payers=(e.quemPaga||[]).map(capitalize).join(', ');
       const parcLabel=getParcelaLabel(e,currentMonth);
+      const dataLabel=formatDateBR(getEffectiveDate(e,currentMonth));
       const desc=e.descricao||e.loja||'';
       const loja=e.loja||'';
       const catIcon=getCategoryIcon(e.categoria);
@@ -1241,7 +1261,7 @@ function renderCartaoTable(){
         <div class="ei-icon cat-${e.categoria||'outros'}">${catIcon}</div>
         <div class="ei-info">
           <div class="ei-name">${desc}${loja&&desc!==loja?' <span style="color:var(--text-secondary);font-weight:400;">· '+loja+'</span>':''}</div>
-          <div class="ei-detail">${parcLabel} · ${payers}</div>
+          <div class="ei-detail">${dataLabel?dataLabel+' · ':''}${parcLabel} · ${payers}</div>
         </div>
         <div class="ei-value">${formatMoney(mv)}</div>
         <div class="ei-actions">
@@ -1259,7 +1279,7 @@ function openExpenseModal(editId){
   document.getElementById('expPessoas').innerHTML=DATA.pessoas.map(p=>`<label><input type="checkbox" value="${p}" onchange="onExpDivisaoChange()"> ${capitalize(p)}</label>`).join('');
   document.getElementById('expCartao').innerHTML=DATA.cartoesBanco.map(c=>`<option value="${c}">${c}</option>`).join('');
   document.getElementById('expCategoria').innerHTML=(DATA.categorias||[]).map(c=>`<option value="${c.id}">${c.icone} ${c.nome}</option>`).join('');
-  if(editId){const exp=DATA.cartao.find(e=>e.id===editId);if(exp){document.getElementById('expLoja').value=exp.loja||'';document.getElementById('expDesc').value=exp.descricao||'';document.getElementById('expTipo').value=exp.tipo||'parcelado';document.getElementById('expValor').value=exp.valor||'';document.getElementById('expParcelas').value=exp.parcelas||1;document.getElementById('expMesInicio').value=exp.mesInicio||currentMonth;document.getElementById('expCartao').value=exp.cartao||'';document.getElementById('expCategoria').value=exp.categoria||'compras';document.getElementById('expDivisao').value=exp.comoDivide||'igual';window.__expDivisaoFixaEdit=Object.assign({},exp.divisaoFixa||{});(exp.quemPaga||[]).forEach(p=>{const cb=document.querySelector(`#expPessoas input[value="${p}"]`);if(cb)cb.checked=true;});}}
+  if(editId){const exp=DATA.cartao.find(e=>e.id===editId);if(exp){document.getElementById('expLoja').value=exp.loja||'';document.getElementById('expDesc').value=exp.descricao||'';document.getElementById('expTipo').value=exp.tipo||'parcelado';document.getElementById('expValor').value=exp.valor||'';document.getElementById('expParcelas').value=exp.parcelas||1;document.getElementById('expMesInicio').value=exp.mesInicio||currentMonth;document.getElementById('expDataCompra').value=exp.dataCompra||(exp.mesInicio?exp.mesInicio+'-01':new Date().toISOString().slice(0,10));document.getElementById('expCartao').value=exp.cartao||'';document.getElementById('expCategoria').value=exp.categoria||'compras';document.getElementById('expDivisao').value=exp.comoDivide||'igual';window.__expDivisaoFixaEdit=Object.assign({},exp.divisaoFixa||{});(exp.quemPaga||[]).forEach(p=>{const cb=document.querySelector(`#expPessoas input[value="${p}"]`);if(cb)cb.checked=true;});}}
   else{
     // Define o mês inicial conforme o dia de corte:
     // antes do corte: mês atual | no dia do corte ou depois: próximo mês
@@ -1270,6 +1290,7 @@ function openExpenseModal(editId){
     document.getElementById('expValor').value='';
     document.getElementById('expParcelas').value=1;
     document.getElementById('expMesInicio').value=mesRef;
+    document.getElementById('expDataCompra').value=new Date().toISOString().slice(0,10);
     document.getElementById('expCartao').value=currentCartao;
     document.getElementById('expCategoria').value='compras';
     document.getElementById('expDivisao').value='igual';window.__expDivisaoFixaEdit=null;
@@ -1348,7 +1369,8 @@ function saveExpense(){
       return showToast(diferenca>0?`Faltando dividir ${formatMoney(diferenca)}`:`Valor excedente ${formatMoney(Math.abs(diferenca))}`,'error');
     }
   }
-  const expense={id:document.getElementById('expEditId').value||uid(),loja,descricao:document.getElementById('expDesc').value.trim(),tipo,valor,parcelas:tipo==='parcelado'?(parseInt(document.getElementById('expParcelas').value)||1):1,mesInicio:document.getElementById('expMesInicio').value||currentMonth,quemPaga,comoDivide:document.getElementById('expDivisao').value,divisaoFixa,cartao:document.getElementById('expCartao').value,categoria:document.getElementById('expCategoria').value};
+  const dataCompra=document.getElementById('expDataCompra').value||new Date().toISOString().slice(0,10);
+  const expense={id:document.getElementById('expEditId').value||uid(),loja,descricao:document.getElementById('expDesc').value.trim(),tipo,valor,parcelas:tipo==='parcelado'?(parseInt(document.getElementById('expParcelas').value)||1):1,mesInicio:document.getElementById('expMesInicio').value||currentMonth,dataCompra,quemPaga,comoDivide:document.getElementById('expDivisao').value,divisaoFixa,cartao:document.getElementById('expCartao').value,categoria:document.getElementById('expCategoria').value};
   const editId=document.getElementById('expEditId').value;
   if(editId){const idx=DATA.cartao.findIndex(e=>e.id===editId);if(idx>=0)DATA.cartao[idx]=expense;}else DATA.cartao.push(expense);
   scheduleSave();closeModal('expenseModal');renderAll();showToast(editId?'Atualizada':'Adicionada');
@@ -2384,7 +2406,7 @@ function renderConferencia(){
     const order={'':0,nao_encontrado:1,nao_cobrado:2,validado:3};
     const sa=order[getConfStatus(a.id)]??0, sb=order[getConfStatus(b.id)]??0;
     if(sa!==sb)return sa-sb;
-    return (a.loja||'').localeCompare(b.loja||'');
+    return getEffectiveDate(a,confMonth).localeCompare(getEffectiveDate(b,confMonth));
   });
   if(!exps.length){list.innerHTML='';if(empty)empty.classList.remove('hidden');updateConfSummary([]);return;}
   if(empty)empty.classList.add('hidden');
@@ -2392,6 +2414,7 @@ function renderConferencia(){
     const status=getConfStatus(e.id);
     const mv=getMonthValue(e);
     const parcLabel=getParcelaLabel(e,confMonth);
+    const dataLabel=formatDateBR(getEffectiveDate(e,confMonth));
     const desc=e.descricao||e.loja||'';
     const loja=e.loja||'';
     let badge='';
@@ -2402,7 +2425,7 @@ function renderConferencia(){
     return `<div class="conf-row">
       <div class="conf-info">
         <div class="ei-name">${desc}${loja&&desc!==loja?' <span style="color:var(--text-secondary);font-weight:400;">· '+loja+'</span>':''}</div>
-        <div class="ei-detail">${parcLabel} · ${e.cartao||''} ${badge}</div>
+        <div class="ei-detail">${dataLabel?dataLabel+' · ':''}${parcLabel} · ${e.cartao||''} ${badge}</div>
       </div>
       <div class="conf-value">${formatMoney(mv)}</div>
       <div class="conf-actions">
