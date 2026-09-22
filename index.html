@@ -1019,9 +1019,14 @@ async function loadData(){
   document.getElementById('lastSync').textContent='Sync: '+new Date().toLocaleTimeString('pt-BR');
 }
 
-async function saveData(){try{const r=await supaFetch('despesas?id=eq.1',{method:'PATCH',body:JSON.stringify({data:DATA})});const rows=await r.json();if(!rows||!rows.length)await supaFetch('despesas',{method:'POST',body:JSON.stringify({id:1,data:DATA})});}catch(e){}}
+async function saveData(){try{const r=await supaFetch('despesas?id=eq.1',{method:'PATCH',body:JSON.stringify({data:DATA}),keepalive:true});const rows=await r.json();if(!rows||!rows.length)await supaFetch('despesas',{method:'POST',body:JSON.stringify({id:1,data:DATA}),keepalive:true});}catch(e){}}
 function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveData(),1500);}
-async function syncData(){const b=document.getElementById('syncBtn');b.classList.add('syncing');b.textContent='↻ ...';await loadData();b.classList.remove('syncing');b.textContent='↻ Sincronizar';showToast('Sincronizado');}
+// Se houver um salvamento pendente (debounce), grava AGORA em vez de esperar.
+// Evita perder edições quando o app vai para segundo plano/fecha (mobile) ou quando o usuário sincroniza logo após editar.
+function flushSave(){if(saveTimer){clearTimeout(saveTimer);saveTimer=null;return saveData();}return Promise.resolve();}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushSave();});
+window.addEventListener('pagehide',()=>{flushSave();});
+async function syncData(){const b=document.getElementById('syncBtn');b.classList.add('syncing');b.textContent='↻ ...';await flushSave();await loadData();b.classList.remove('syncing');b.textContent='↻ Sincronizar';showToast('Sincronizado');}
 
 // ===== NAV =====
 function closePersonalPage(){
