@@ -485,9 +485,9 @@ tbody tr:last-child td { border-bottom:none; }
     <div class="page-header">
       <h1 class="page-title">Compartilhado</h1>
       <div class="month-selector">
-        <button onclick="changeMonth(-1)">◀</button>
+        <button onclick="changeSharedMonth(-1)">◀</button>
         <span class="month-label" id="monthLabel"></span>
-        <button onclick="changeMonth(1)">▶</button>
+        <button onclick="changeSharedMonth(1)">▶</button>
       </div>
     </div>
     <div class="cards-row" id="cardsRow"></div>
@@ -957,6 +957,7 @@ function supaFetch(path,opts={}){return fetch(`${SUPA_URL}/rest/v1/${path}`,{...
 // ===== STATE =====
 let DATA={cartao:[],pessoal:[],apto:{},bancos:['Itaú','PagBank','Nubank','Bradesco'],cartoesBanco:['Itaú','PagBank'],pessoas:['duanni','alan','ronaldo','sueli'],divisao:{duanni:50,alan:50},diaCorte:8,cartaoStatus:[],devoIds:[],devoConfig:{titulo:'💕 cartão do meu amor',legenda:'despesas minhas no cartão dele · subtraído do total'},customData:[],receitaMensal:0,receitaPorMes:{},simulacoes:[],caixa:{},aluguel:{},aluguelDescontos:[],amorItems:[],manualCards:{},conferencia:{},categorias:[{id:'compras',nome:'Compras',icone:'🛒'},{id:'alimentacao',nome:'Alimentação',icone:'🍔'},{id:'assinaturas',nome:'Assinaturas',icone:'📝'},{id:'streamings',nome:'Streamings',icone:'📺'},{id:'saude',nome:'Saúde/Beleza',icone:'💊'},{id:'lazer',nome:'Lazer',icone:'🎮'},{id:'presentes',nome:'Presentes',icone:'🎁'},{id:'snow',nome:'Snow 🐶',icone:'🐶'},{id:'poupanca',nome:'Poupança',icone:'🏦'},{id:'outros',nome:'Outros',icone:'📦'}]};
 let currentMonth=new Date().toISOString().slice(0,7);
+let sharedMonth=getDefaultMesInicio(); // Compartilhado: respeita o dia de corte configurado
 let currentPage='page-cartao';
 let currentCartao='';
 let currentFilter='';
@@ -967,6 +968,7 @@ let personalUnlocked=false;
 // ===== INIT - NO AUTH FOR SHARED =====
 document.addEventListener('DOMContentLoaded',async()=>{
   setMonthInputs(currentMonth);
+  setSharedMonthInputs(sharedMonth);
   await loadPasswords();
   loadData(); // direct load, no auth needed
 });
@@ -1117,14 +1119,25 @@ function formatDateBR(dateStr){if(!dateStr)return'';const[y,m,d]=dateStr.split('
 function getDefaultMesInicio(){
   const hoje=new Date();
   const diaCorte=DATA.diaCorte||8;
-  const mesReferencia=hoje.getDate()>=diaCorte
+  // Enquanto não passar do dia de corte, mantém o mês atual.
+  // A partir do dia seguinte ao corte (corte+1), já considera o próximo mês.
+  const mesReferencia=hoje.getDate()>diaCorte
     ? new Date(hoje.getFullYear(),hoje.getMonth()+1,1)
     : new Date(hoje.getFullYear(),hoje.getMonth(),1);
   return formatYearMonthLocal(mesReferencia);
 }
-function setMonthInputs(m){const monthNames=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];const[y,mo]=m.split('-').map(Number);const label=monthNames[mo-1]+' '+y;document.querySelectorAll('.month-label').forEach(el=>el.textContent=label);}
+// Rótulo de mês para todas as áreas EXCETO o Compartilhado (que tem seu próprio mês/rótulo, ver setSharedMonthInputs)
+function setMonthInputs(m){const monthNames=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];const[y,mo]=m.split('-').map(Number);const label=monthNames[mo-1]+' '+y;document.querySelectorAll('.month-label:not(#monthLabel)').forEach(el=>el.textContent=label);}
 function onMonthChange(){setMonthInputs(currentMonth);renderAll();}
 function changeMonth(d){const[y,m]=currentMonth.split('-').map(Number);const dt=new Date(y,m-1+d,1);currentMonth=formatYearMonthLocal(dt);setMonthInputs(currentMonth);renderAll();}
+
+// ===== MÊS DO COMPARTILHADO (respeita o dia de corte) =====
+// Diferente do currentMonth (mês calendário normal usado em Pessoal e demais áreas),
+// o Compartilhado usa o mês de referência do ciclo do cartão: enquanto não passar do
+// dia de corte, mostra o mês atual; a partir do dia seguinte ao corte, já mostra o
+// próximo mês (pois os novos gastos pertencem ao próximo ciclo).
+function setSharedMonthInputs(m){const monthNames=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];const[y,mo]=m.split('-').map(Number);const label=monthNames[mo-1]+' '+y;const el=document.getElementById('monthLabel');if(el)el.textContent=label;}
+function changeSharedMonth(d){const[y,m]=sharedMonth.split('-').map(Number);const dt=new Date(y,m-1+d,1);sharedMonth=formatYearMonthLocal(dt);setSharedMonthInputs(sharedMonth);renderCards();renderCartaoTable();}
 
 // ===== RENDER ALL =====
 function renderAll(){renderCards();renderPersonFilter();renderCartaoTable();renderDuanniInicio();renderDuanniMeta();renderDuanniPlanejamento();renderDuanniSimular();renderDuanniControle();renderAlan();renderRonaldo();renderAllDynamicPersonPages();renderApto();renderConfig();renderConferencia();}
@@ -1201,7 +1214,7 @@ function getCardWaveHTML(name){
 function renderCards(){
   const row=document.getElementById('cardsRow');if(!row)return;
   row.innerHTML=DATA.cartoesBanco.map(name=>{
-    const total=getMonthExpenses(currentMonth,name).reduce((s,e)=>s+getMonthValue(e),0);
+    const total=getMonthExpenses(sharedMonth,name).reduce((s,e)=>s+getMonthValue(e),0);
     return`<div class="credit-card ${getCardColor(name)} ${currentCartao===name?'active':''}" onclick="selectCard('${name}')">
       <div class="cc-pattern"></div>
       ${getCardWaveHTML(name)}
@@ -1229,12 +1242,12 @@ function setFilter(f){currentFilter=f;renderPersonFilter();renderCartaoTable();}
 function renderCartaoTable(){
   const tbody=document.getElementById('cartaoBody'),empty=document.getElementById('cartaoEmpty');
   const mobileList=document.getElementById('cartaoList');
-  let exps=getMonthExpenses(currentMonth,currentCartao);
+  let exps=getMonthExpenses(sharedMonth,currentCartao);
   if(currentFilter)exps=exps.filter(e=>e.quemPaga&&e.quemPaga.includes(currentFilter));
   if(!exps.length){tbody.innerHTML='';if(mobileList)mobileList.innerHTML='';empty.classList.remove('hidden');return;}
   empty.classList.add('hidden');
   // Sort by data da cobrança no mês atual (mais recente -> mais antiga; recorrente usa o dia original todo mês)
-  exps.sort((a,b)=>getEffectiveDate(b,currentMonth).localeCompare(getEffectiveDate(a,currentMonth)));
+  exps.sort((a,b)=>getEffectiveDate(b,sharedMonth).localeCompare(getEffectiveDate(a,sharedMonth)));
   // Desktop: tabela
   tbody.innerHTML=exps.map(e=>{
     const mv=getMonthValue(e);
@@ -1246,8 +1259,8 @@ function renderCartaoTable(){
       else{const each=mv/payers.length;quemCol=payers.map(p=>`<span style="white-space:nowrap;">${capitalize(p)} <span style="color:var(--text-secondary);font-size:10px;">${formatMoney(each)}</span></span>`).join(', ');}
     }
     return`<tr>
-    <td style="font-size:11px;color:var(--text-secondary);white-space:nowrap;">${formatDateBR(getEffectiveDate(e,currentMonth))}</td>
-    <td><strong>${e.loja||''}</strong></td><td>${e.descricao||''}</td><td>${getParcelaLabel(e,currentMonth)}</td>
+    <td style="font-size:11px;color:var(--text-secondary);white-space:nowrap;">${formatDateBR(getEffectiveDate(e,sharedMonth))}</td>
+    <td><strong>${e.loja||''}</strong></td><td>${e.descricao||''}</td><td>${getParcelaLabel(e,sharedMonth)}</td>
     <td>${formatMoney(e.valor)}</td><td><strong>${formatMoney(mv)}</strong></td>
     <td style="font-size:11px;">${quemCol}</td>
     <td><div style="display:flex;gap:3px;"><button class="btn-icon" onclick="editExpense('${e.id}')">✎</button><button class="btn-icon" onclick="deleteExpense('${e.id}')" style="color:var(--danger)">✕</button></div></td>
@@ -1257,8 +1270,8 @@ function renderCartaoTable(){
     mobileList.innerHTML=exps.map(e=>{
       const mv=getMonthValue(e);
       const payers=(e.quemPaga||[]).map(capitalize).join(', ');
-      const parcLabel=getParcelaLabel(e,currentMonth);
-      const dataLabel=formatDateBR(getEffectiveDate(e,currentMonth));
+      const parcLabel=getParcelaLabel(e,sharedMonth);
+      const dataLabel=formatDateBR(getEffectiveDate(e,sharedMonth));
       const desc=e.descricao||e.loja||'';
       const loja=e.loja||'';
       const catIcon=getCategoryIcon(e.categoria);
@@ -1284,7 +1297,7 @@ function openExpenseModal(editId){
   document.getElementById('expPessoas').innerHTML=DATA.pessoas.map(p=>`<label><input type="checkbox" value="${p}" onchange="onExpDivisaoChange()"> ${capitalize(p)}</label>`).join('');
   document.getElementById('expCartao').innerHTML=DATA.cartoesBanco.map(c=>`<option value="${c}">${c}</option>`).join('');
   document.getElementById('expCategoria').innerHTML=(DATA.categorias||[]).map(c=>`<option value="${c.id}">${c.icone} ${c.nome}</option>`).join('');
-  if(editId){const exp=DATA.cartao.find(e=>e.id===editId);if(exp){document.getElementById('expLoja').value=exp.loja||'';document.getElementById('expDesc').value=exp.descricao||'';document.getElementById('expTipo').value=exp.tipo||'parcelado';document.getElementById('expValor').value=exp.valor||'';document.getElementById('expParcelas').value=exp.parcelas||1;document.getElementById('expMesInicio').value=exp.mesInicio||currentMonth;document.getElementById('expDataCompra').value=exp.dataCompra||(exp.mesInicio?exp.mesInicio+'-01':new Date().toISOString().slice(0,10));document.getElementById('expCartao').value=exp.cartao||'';document.getElementById('expCategoria').value=exp.categoria||'compras';document.getElementById('expDivisao').value=exp.comoDivide||'igual';window.__expDivisaoFixaEdit=Object.assign({},exp.divisaoFixa||{});(exp.quemPaga||[]).forEach(p=>{const cb=document.querySelector(`#expPessoas input[value="${p}"]`);if(cb)cb.checked=true;});}}
+  if(editId){const exp=DATA.cartao.find(e=>e.id===editId);if(exp){document.getElementById('expLoja').value=exp.loja||'';document.getElementById('expDesc').value=exp.descricao||'';document.getElementById('expTipo').value=exp.tipo||'parcelado';document.getElementById('expValor').value=exp.valor||'';document.getElementById('expParcelas').value=exp.parcelas||1;document.getElementById('expMesInicio').value=exp.mesInicio||sharedMonth;document.getElementById('expDataCompra').value=exp.dataCompra||(exp.mesInicio?exp.mesInicio+'-01':new Date().toISOString().slice(0,10));document.getElementById('expCartao').value=exp.cartao||'';document.getElementById('expCategoria').value=exp.categoria||'compras';document.getElementById('expDivisao').value=exp.comoDivide||'igual';window.__expDivisaoFixaEdit=Object.assign({},exp.divisaoFixa||{});(exp.quemPaga||[]).forEach(p=>{const cb=document.querySelector(`#expPessoas input[value="${p}"]`);if(cb)cb.checked=true;});}}
   else{
     // Define o mês inicial conforme o dia de corte:
     // antes do corte: mês atual | no dia do corte ou depois: próximo mês
@@ -1375,7 +1388,7 @@ function saveExpense(){
     }
   }
   const dataCompra=document.getElementById('expDataCompra').value||new Date().toISOString().slice(0,10);
-  const expense={id:document.getElementById('expEditId').value||uid(),loja,descricao:document.getElementById('expDesc').value.trim(),tipo,valor,parcelas:tipo==='parcelado'?(parseInt(document.getElementById('expParcelas').value)||1):1,mesInicio:document.getElementById('expMesInicio').value||currentMonth,dataCompra,quemPaga,comoDivide:document.getElementById('expDivisao').value,divisaoFixa,cartao:document.getElementById('expCartao').value,categoria:document.getElementById('expCategoria').value};
+  const expense={id:document.getElementById('expEditId').value||uid(),loja,descricao:document.getElementById('expDesc').value.trim(),tipo,valor,parcelas:tipo==='parcelado'?(parseInt(document.getElementById('expParcelas').value)||1):1,mesInicio:document.getElementById('expMesInicio').value||sharedMonth,dataCompra,quemPaga,comoDivide:document.getElementById('expDivisao').value,divisaoFixa,cartao:document.getElementById('expCartao').value,categoria:document.getElementById('expCategoria').value};
   const editId=document.getElementById('expEditId').value;
   if(editId){const idx=DATA.cartao.findIndex(e=>e.id===editId);if(idx>=0)DATA.cartao[idx]=expense;}else DATA.cartao.push(expense);
   scheduleSave();closeModal('expenseModal');renderAll();showToast(editId?'Atualizada':'Adicionada');
