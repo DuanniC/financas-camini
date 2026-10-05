@@ -806,7 +806,8 @@ tbody tr:last-child td { border-bottom:none; }
           Conferência do Compartilhado
           <span class="badge badge-pending" id="confMonthLabel" style="margin-left:auto;"></span>
         </div>
-        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:14px;">Confira se cada despesa cadastrada realmente bate com o que caiu no cartão. Não é preciso justificar nada — é só marcar o que já foi conferido. Mostra sempre o mês vigente do cartão (considerando o dia de corte).</p>
+        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:14px;">Confira se cada despesa cadastrada realmente bate com o que caiu no cartão. Não é preciso justificar nada — é só marcar o que já foi conferido. Escolha entre o mês atual e o mês do cartão (que já avança após o dia de corte).</p>
+        <div class="filter-row" id="confMonths" style="margin-bottom:10px;"></div>
         <div class="conf-summary" id="confSummary"></div>
         <div class="filter-row" id="confFilter" style="margin-bottom:10px;"></div>
         <div id="confList"></div>
@@ -2401,7 +2402,10 @@ function renderConfig(){
 
 // ===== CONFERÊNCIA DE INFORMAÇÕES =====
 let confFilterCartao='';
-function getConfMonth(){return getDefaultMesInicio();}
+let confMonthSel='';
+function getCalendarMonth(){const h=new Date();return formatYearMonthLocal(new Date(h.getFullYear(),h.getMonth(),1));}
+function getConfMonth(){return confMonthSel||getDefaultMesInicio();}
+function setConfMonth(m){confMonthSel=m;renderConferencia();}
 function getConfKey(month,id){return `${month}_${id}`;}
 function getConfStatus(id){return (DATA.conferencia||{})[getConfKey(getConfMonth(),id)]||'';}
 function setConfStatus(id,status){
@@ -2419,6 +2423,14 @@ function renderConferencia(){
   const confMonth=getConfMonth();
   const lbl=document.getElementById('confMonthLabel');
   if(lbl){const monthNames=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];const[y,mo]=confMonth.split('-').map(Number);lbl.textContent=monthNames[mo-1]+'/'+y;}
+  const monthsEl=document.getElementById('confMonths');
+  if(monthsEl){
+    const mn=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const fmt=m=>{const[yy,mm]=m.split('-').map(Number);return mn[mm-1]+'/'+yy;};
+    const atual=getCalendarMonth(), cartao=getDefaultMesInicio();
+    const opts=atual===cartao?[[cartao,'Mês atual / cartão']]:[[atual,'Mês atual'],[cartao,'Mês do cartão']];
+    monthsEl.innerHTML=opts.map(([m,t])=>`<div class="chip ${m===confMonth?'active':''}" onclick="setConfMonth('${m}')">${fmt(m)} · ${t}</div>`).join('');
+  }
   if(filterEl){
     filterEl.innerHTML=['Todos',...DATA.cartoesBanco].map(c=>{
       const isA=(c==='Todos'&&!confFilterCartao)||confFilterCartao===c;
