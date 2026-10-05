@@ -807,6 +807,7 @@ tbody tr:last-child td { border-bottom:none; }
           <span class="badge badge-pending" id="confMonthLabel" style="margin-left:auto;"></span>
         </div>
         <p style="font-size:12px;color:var(--text-secondary);margin-bottom:14px;">Confira se cada despesa cadastrada realmente bate com o que caiu no cartão. Não é preciso justificar nada — é só marcar o que já foi conferido. Escolha entre o mês atual e o mês do cartão (que já avança após o dia de corte).</p>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:10px;"><button class="btn btn-primary" onclick="openConfExpense()">＋ Nova Despesa</button></div>
         <div class="filter-row" id="confMonths" style="margin-bottom:10px;"></div>
         <div class="conf-summary" id="confSummary"></div>
         <div class="filter-row" id="confFilter" style="margin-bottom:10px;"></div>
@@ -2406,6 +2407,12 @@ let confMonthSel='';
 function getCalendarMonth(){const h=new Date();return formatYearMonthLocal(new Date(h.getFullYear(),h.getMonth(),1));}
 function getConfMonth(){return confMonthSel||getDefaultMesInicio();}
 function setConfMonth(m){confMonthSel=m;renderConferencia();}
+function openConfExpense(){
+  openExpenseModal();
+  const mi=document.getElementById('expMesInicio');if(mi)mi.value=getConfMonth();
+  if(confFilterCartao){const c=document.getElementById('expCartao');if(c)c.value=confFilterCartao;}
+  if(typeof updateParcelaPreview==='function')updateParcelaPreview('exp');
+}
 function getConfKey(month,id){return `${month}_${id}`;}
 function getConfStatus(id){return (DATA.conferencia||{})[getConfKey(getConfMonth(),id)]||'';}
 function setConfStatus(id,status){
@@ -2468,6 +2475,8 @@ function renderConferencia(){
         <button class="conf-btn ${status==='validado'?'active-validar':''}" onclick="setConfStatus('${e.id}','validado')">✓ Validar</button>
         <button class="conf-btn ${status==='nao_cobrado'?'active-espera':''}" onclick="setConfStatus('${e.id}','nao_cobrado')">🕓 Ainda não cobrado</button>
         <button class="conf-btn ${status==='nao_encontrado'?'active-nao':''}" onclick="setConfStatus('${e.id}','nao_encontrado')">❓ Não encontrado</button>
+        <button class="btn-icon" title="Editar" onclick="editExpense('${e.id}')">✎</button>
+        <button class="btn-icon" title="Excluir" onclick="deleteExpense('${e.id}')" style="color:var(--danger)">✕</button>
       </div>
     </div>`;
   }).join('');
